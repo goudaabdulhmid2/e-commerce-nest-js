@@ -3,9 +3,10 @@ import { HydratedDocument } from "mongoose";
 import { RoleEnum } from "../enums/role.enum";
 import { GenderEnum } from "../enums/gender.enum";
 
-export type UserDocument = HydratedDocument<User>
+export type UserDocument = HydratedDocument<User> & Document
 
 
+// Define Schema
 @Schema({
     timestamps:true
 })
@@ -82,4 +83,5 @@ export class User {
 }
 
 
+// Convert Class → Schema
 export const userSchema = SchemaFactory.createForClass(User);
