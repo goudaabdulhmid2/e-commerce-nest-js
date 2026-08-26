@@ -7,8 +7,8 @@ import { Model } from "mongoose";
 
 
 @Injectable()
-export class RevokTokenRepository extends BaseRepository<RevokedTokenDocument> {
-    constructor(@InjectModel(RevokedToken.name) private readonly revokTokenModel: Model<RevokedTokenDocument>) {
-        super(revokTokenModel);
+export class RevokedTokenRepository extends BaseRepository<RevokedTokenDocument> {
+    constructor(@InjectModel(RevokedToken.name) private readonly revokedTokenModel: Model<RevokedTokenDocument>) {
+        super(revokedTokenModel);
     }
 }
