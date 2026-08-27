@@ -7,7 +7,9 @@ import { UsersModule } from './users/users.module';
 import { CategoriesModule } from './categories/categories.module';
 import { SubCategoriesModule } from './sub-categories/sub-categories.module';
 import { AuthModule } from './auth/auth.module';
-
+import { APP_FILTER } from '@nestjs/core';
+import { GlobalExceptionFilter } from './common/filters/global-exceptions.filter';
+import { UsersService } from './users/users.service';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -31,7 +33,12 @@ import { AuthModule } from './auth/auth.module';
   ],
   controllers: [AppController],
   providers: [
-    AppService
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter
+    },
+    AppService,
+    UsersService
   ],
 })
 export class AppModule {}

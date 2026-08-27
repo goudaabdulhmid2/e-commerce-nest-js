@@ -1,87 +1,87 @@
-import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { HydratedDocument } from "mongoose";
-import { RoleEnum } from "../enums/role.enum";
-import { GenderEnum } from "../enums/gender.enum";
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { HydratedDocument } from 'mongoose';
 
-export type UserDocument = HydratedDocument<User> & Document
+import { RoleEnum } from '../enums/role.enum';
+import { GenderEnum } from '../enums/gender.enum';
 
+export type UserDocument = HydratedDocument<User>;
 
-// Define Schema
 @Schema({
-    timestamps:true
+  timestamps: true,
 })
 export class User {
-    @Prop({
-        type:String,
-        required:true,
-        lowercase:true,
-        trim:true
-    })
-    firstName!: string;
+  @Prop({
+    type: String,
+    required: true,
+    trim: true,
+  })
+  firstName!: string;
 
-    @Prop({
-        type:String,
-        required:true,
-        lowercase:true,
-        trim:true
-    })
-    lastName!: string;
+  @Prop({
+    type: String,
+    required: true,
+    trim: true,
+  })
+  lastName!: string;
 
-    @Prop({
-        type:String,
-        required:true,
-        unique:true,
-        index:{name:'emaii_unique_idx'}
-    })
-    email!: string;
+  @Prop({
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+    index: {
+      name: 'email_unique_idx',
+    },
+  })
+  email!: string;
 
-    @Prop({
-        type:String,
-        required:true
-    })
-    password!: string;
+  @Prop({
+    type: String,
+    required: true,
+    select: false,
+  })
+  password!: string;
 
-    @Prop({
-        type:String,
-        enum:RoleEnum,
-        default:RoleEnum.USER,
-    })
-    role!: string;
+  @Prop({
+    type: String,
+    enum: RoleEnum,
+    default: RoleEnum.USER,
+  })
+  role!: RoleEnum;
 
-    @Prop({
-        type:String,
-        enum:GenderEnum,
-        required:true,
-    })
-    gender!: string;
+  @Prop({
+    type: String,
+    enum: GenderEnum,
+    required: true,
+  })
+  gender!: GenderEnum;
 
-    @Prop({
-        type:String,
-        required:true
-    })
-    phone!: string;
+  @Prop({
+    type: String,
+    required: true,
+    trim: true,
+  })
+  phone!: string;
 
-    @Prop({
-        type:Boolean,
-        default:false
-    })
-    isEmailVerified!: boolean;
-    
-    @Prop({
-        type:Date,
-        required:true
-    })
-    dateOfBirth!: Date;
+  @Prop({
+    type: Boolean,
+    default: false,
+  })
+  isEmailVerified!: boolean;
 
+  @Prop({
+    type: Date,
+    required: true,
+  })
+  dateOfBirth!: Date;
 
-    @Prop({
-        type:Boolean,
-        default:false
-    })
-    isDeleted!: boolean;
-
+  @Prop({
+    type: Boolean,
+    default: false,
+  })
+  isDeleted!: boolean;
 }
 
-
-// Convert Class → Schema
-export const userSchema = SchemaFactory.createForClass(User);
+export const UserSchema =
+  SchemaFactory.createForClass(User);

@@ -12,7 +12,13 @@ export class UserRepository extends BaseRepository <UserDocument>{
         super(userModel);
     }
 
-    async findBtEmail(email: string) : Promise<UserDocument | null> {
-        return this.model.findOne({ email }).exec();
+    async findByEmail(email: string): Promise<UserDocument | null> {
+        return this.model.findOne({ email }).select('+password').exec();
+    }
+
+    async existsByEmail(email: string): Promise<boolean>{
+        const user = await this.model.exists({email}).exec();
+
+        return !!user;
     }
 }
