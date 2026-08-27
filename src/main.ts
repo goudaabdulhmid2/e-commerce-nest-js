@@ -1,33 +1,48 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { NestFactory } from '@nestjs/core';
+
+import { AppModule } from './app.module';
+import { GlobalExceptionFilter } from './common/filters/global-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.useGlobalPipes(new ValidationPipe({
-    // delete properties that do in the DTO
-    whitelist: true,
-    // throw an error if a property that do not exist in the DTO is sent
-    forbidNonWhitelisted: true,
-    // automatically transform payloads to be objects typed according to their DTO classes
-    transform: true,
+  app.useGlobalPipes(
+    new ValidationPipe({
+      // Remove properties that are not defined in the DTO
+      whitelist: true,
 
-    // customize the error response for validation errors
-    exceptionFactory: (errors) => {
-      return new BadRequestException({
-        message: 'Validation failed',
-        errors: errors.map((error) => ({
-          field: error.property,
-          message: Object.values(error.constraints ?? {}).join(', '),
-        })),
-      })
-    }
-  }));
+      // Instead of silently removing unknown properties,
+      // throw a 400 Bad Request error
+      forbidNonWhitelisted: true,
 
-  app.useGlobalFilters(new HttpExceptionFilter());
+      // Transform incoming payloads into DTO instances
+      transform: true,
+
+      // Customize the validation error response
+      exceptionFactory: (errors) => {
+        return new BadRequestException({
+          message: 'Validation failed',
+
+          errors: errors.map((error) => ({
+            // The name of the field that failed validation
+            field: error.property,
+
+            // All validation messages for this field
+            message: Object.values(
+              error.constraints ?? {},
+            ).join(', '),
+          })),
+        });
+      },
+    }),
+  );
+
+  app.useGlobalFilters(
+    new GlobalExceptionFilter(),
+  );
 
   await app.listen(process.env.PORT ?? 3000);
 }
+
 bootstrap();
