@@ -25,6 +25,9 @@ export class SignupDto{
     @IsStrongPassword()
     password!: string;
 
+
+  // Validate that confirmPassword has the same value
+  // as the password property.
     @IsString()
     @IsNotEmpty()
     @Match('password', {
@@ -39,6 +42,8 @@ export class SignupDto{
     @IsEnum(GenderEnum)
     gender!: GenderEnum;
 
+    // Convert the incoming date string into a Date object
+    // before running the @IsDate() validation.
     @Type(() => Date)
     @IsDate()
     dateOfBirth!: Date;

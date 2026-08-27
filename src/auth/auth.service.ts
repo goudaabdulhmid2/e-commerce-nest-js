@@ -7,6 +7,8 @@ import { OtpDocument } from './schemas/otp.schema/otp.schema';
 import { UsersService } from 'src/users/users.service';
 import { SignupDto } from './dto/signup.dto';
 import { CreateUserData } from 'src/users/types/create-user.type';
+import { AuthMapper } from './mappers/auth.mapper';
+import { EncryptionService } from 'src/common/security/encryption/encryption.service';
 
 @Injectable()
 export class AuthService {
@@ -14,7 +16,8 @@ export class AuthService {
     constructor(
         private readonly otpRepository: OtpRepository, 
         private readonly passwordService: PasswordService,
-        private readonly userService: UsersService
+        private readonly userService: UsersService,
+        private readonly encryptionService: EncryptionService
     ) {}
 
     async createOtp(userId: Types.ObjectId, otp: string, otpType: OtpTypes, expireTime?:Date ) : Promise<OtpDocument | null> {
@@ -41,13 +44,16 @@ export class AuthService {
 
         const hashedPassword =
             await this.passwordService.hash(signupDto.password);
+
+        const encryptedPhone = 
+            this.encryptionService.encrypt(signupDto.phone)
         
         const userData: CreateUserData = {
             firstName: signupDto.firstName,
             lastName: signupDto.lastName,
             email: signupDto.email,
             password: hashedPassword,
-            phone: signupDto.phone,
+            phone: encryptedPhone,
             gender: signupDto.gender,
             dateOfBirth: signupDto.dateOfBirth,
         };
@@ -55,7 +61,7 @@ export class AuthService {
 
         const user = await this.userService.create(userData);
 
-        return user;
+        return AuthMapper.toSignupResponse(user);
     }
     
 

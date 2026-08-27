@@ -8,10 +8,12 @@ import { PasswordModule } from 'src/common/security/password/password.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UsersModule } from 'src/users/users.module';
+import { EncryptionModule } from 'src/common/security/encryption/encryption.module';
 
 @Module({
     imports:[
         PasswordModule,
+        EncryptionModule,
         UsersModule,
         // Register Schema in Module
         MongooseModule.forFeature([
