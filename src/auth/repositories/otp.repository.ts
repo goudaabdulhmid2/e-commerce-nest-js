@@ -14,4 +14,20 @@ export class OtpRepository extends BaseRepository<OtpDocument> {
         super(otpModel);
     }
 
+    async findActiveOtp(
+        userId: Types.ObjectId,
+        otpType: OtpTypes,
+    ) : Promise<OtpDocument | null> {
+        return this.model.findOne({
+            userId,
+            otpType,
+            isUsed: false,
+            expiresAt: {
+                $gt: new Date()
+            }
+        })
+        .select('+otp')
+        .exec()
+    }
+
 }

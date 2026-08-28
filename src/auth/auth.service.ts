@@ -9,6 +9,8 @@ import { SignupDto } from './dto/signup.dto';
 import { CreateUserData } from 'src/users/types/create-user.type';
 import { AuthMapper } from './mappers/auth.mapper';
 import { EncryptionService } from 'src/common/security/encryption/encryption.service';
+import { OtpService } from './services/otp.service';
+import { EmailService } from 'src/common/email/email.service';
 
 @Injectable()
 export class AuthService {
@@ -17,19 +19,10 @@ export class AuthService {
         private readonly otpRepository: OtpRepository, 
         private readonly passwordService: PasswordService,
         private readonly userService: UsersService,
-        private readonly encryptionService: EncryptionService
+        private readonly encryptionService: EncryptionService,
+        private readonly otpService: OtpService,
+        private readonly emailService: EmailService
     ) {}
-
-    async createOtp(userId: Types.ObjectId, otp: string, otpType: OtpTypes, expireTime?:Date ) : Promise<OtpDocument | null> {
-        const hashedOtp = await this.passwordService.hash(otp);
-        const data = {
-            userId,
-            otp: hashedOtp,
-            otpType,
-            expireTime: expireTime || new Date(Date.now() + 10* 60 * 1000) // Default to 5 minutes from now
-        };
-        return this.otpRepository.create(data);
-    }
 
 
     async signup(signupDto: SignupDto){
@@ -38,6 +31,10 @@ export class AuthService {
             signupDto.email
             );
 
+
+        // Check if the email is already registered.
+        // This prevents unnecessary database insertion attempts
+        // in the normal case.
         if(emailExists){
             throw new ConflictException('Email already exists')
         }
@@ -60,6 +57,18 @@ export class AuthService {
 
 
         const user = await this.userService.create(userData);
+
+        // Genrate and store the email verification OTP
+        const {otp} = await this.otpService.createOtp(
+            user._id, 
+            OtpTypes.EMAIL_VERIFICATION
+        );
+
+        // send the otp
+        await this.emailService.sendOtp(
+            user.email,
+            otp
+        );
 
         return AuthMapper.toSignupResponse(user);
     }

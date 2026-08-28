@@ -9,12 +9,15 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UsersModule } from 'src/users/users.module';
 import { EncryptionModule } from 'src/common/security/encryption/encryption.module';
+import { OtpService } from './services/otp.service';
+import { EmailModule } from 'src/common/email/email.module';
 
 @Module({
     imports:[
         PasswordModule,
         EncryptionModule,
         UsersModule,
+        EmailModule,
         // Register Schema in Module
         MongooseModule.forFeature([
             { name:RevokedToken.name, schema: RevokedTokenSchema },
@@ -24,7 +27,8 @@ import { EncryptionModule } from 'src/common/security/encryption/encryption.modu
     providers:[
         RevokedTokenRepository,
         OtpRepository,
-        AuthService
+        AuthService,
+        OtpService
     ],
     controllers: [AuthController]
 })

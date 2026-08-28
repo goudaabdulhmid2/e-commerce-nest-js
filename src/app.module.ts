@@ -7,9 +7,12 @@ import { UsersModule } from './users/users.module';
 import { CategoriesModule } from './categories/categories.module';
 import { SubCategoriesModule } from './sub-categories/sub-categories.module';
 import { AuthModule } from './auth/auth.module';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { GlobalExceptionFilter } from './common/filters/global-exceptions.filter';
 import { UsersService } from './users/users.service';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { EmailModule } from './common/email/email.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -25,14 +28,24 @@ import { UsersService } from './users/users.service';
         uri: configService.getOrThrow<string>('DB_URL'),
       }),
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000, // 60 sec
+        limit:100 // 100 request
+      }
+    ]),
     UsersModule,
     CategoriesModule,
     SubCategoriesModule,
     AuthModule,
+    EmailModule
     
   ],
-  controllers: [AppController],
   providers: [
+    {
+      provide: APP_GUARD, 
+      useClass: ThrottlerGuard
+    },
     {
       provide: APP_FILTER,
       useClass: GlobalExceptionFilter
@@ -40,5 +53,7 @@ import { UsersService } from './users/users.service';
     AppService,
     UsersService
   ],
+
+  controllers: [AppController],
 })
 export class AppModule {}

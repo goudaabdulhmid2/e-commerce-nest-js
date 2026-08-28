@@ -24,6 +24,10 @@ export class User {
   })
   lastName!: string;
 
+// Create a unique database index on the email field.
+// This guarantees that two users cannot have the same email,
+// even if multiple requests try to create them at the same time.
+// The unique index is the actual protection against race conditions.
   @Prop({
     type: String,
     required: true,

@@ -16,6 +16,9 @@ export class UserRepository extends BaseRepository <UserDocument>{
         return this.model.findOne({ email }).select('+password').exec();
     }
 
+    // Check whether a user with the given email already exists.
+    // This is an application-level check used to provide
+    // an early and user-friendly response.
     async existsByEmail(email: string): Promise<boolean>{
         const user = await this.model.exists({email}).exec();
 

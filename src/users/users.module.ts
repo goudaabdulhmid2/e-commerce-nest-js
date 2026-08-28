@@ -13,11 +13,12 @@ import { UsersService } from './users.service';
         )
     ] ,
     providers:[
-        UserRepository,
         UsersService,
+        UserRepository,
     ],
     exports:[
-        UsersService
+        UsersService,
+        UserRepository
     ]
    
 })
