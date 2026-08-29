@@ -14,6 +14,7 @@ import { EmailService } from 'src/common/email/email.service';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EmailVerificationRequestEvent } from './events/email-verification-requested.event';
+import { EmailQueueService } from 'src/common/queue/email/email-queue.service';
 
 @Injectable()
 export class AuthService {
@@ -24,7 +25,8 @@ export class AuthService {
         private readonly encryptionService: EncryptionService,
         private readonly otpService: OtpService,
         private readonly emailService: EmailService,
-        private readonly eventEmitter: EventEmitter2
+        // private readonly eventEmitter: EventEmitter2,
+        private readonly emailQueueService: EmailQueueService
     ) {}
 
     async verifyOtp(
@@ -96,13 +98,20 @@ export class AuthService {
 
         // Publish an event requesting an email verification message.
         // The listener will handle sending the actual email.
-        this.eventEmitter.emit(
-            'auth.email-verification-requested',
-            new EmailVerificationRequestEvent(
-                user._id,
-                user.email,
-                otp
-            )
+        // this.eventEmitter.emit(
+        //     'auth.email-verification-requested',
+        //     new EmailVerificationRequestEvent(
+        //         user._id,
+        //         user.email,
+        //         otp
+        //     )
+        // )
+
+        // Add an email verification job to the queue.
+        // The actual email sending will be handled by a worker.
+        await this.emailQueueService.addVerificationEmail(
+            user.email,
+            otp
         )
 
         return AuthMapper.toSignupResponse(user);

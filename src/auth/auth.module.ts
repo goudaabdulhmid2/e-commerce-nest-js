@@ -12,6 +12,7 @@ import { EncryptionModule } from 'src/common/security/encryption/encryption.modu
 import { OtpService } from './services/otp.service';
 import { EmailModule } from 'src/common/email/email.module';
 import { EmailVerificationListener } from './listeners/email-verification.listener';
+import { QueueModule } from 'src/common/queue/queue.module';
 
 @Module({
     imports:[
@@ -19,6 +20,7 @@ import { EmailVerificationListener } from './listeners/email-verification.listen
         EncryptionModule,
         UsersModule,
         EmailModule,
+        QueueModule,
         // Register Schema in Module
         MongooseModule.forFeature([
             { name:RevokedToken.name, schema: RevokedTokenSchema },
