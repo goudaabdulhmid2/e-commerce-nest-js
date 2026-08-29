@@ -1,6 +1,8 @@
 import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { Injectable } from "@nestjs/common";
 import { Job } from "bullmq";
+
+
 import { EmailService } from "src/common/email/email.service";
 
 
