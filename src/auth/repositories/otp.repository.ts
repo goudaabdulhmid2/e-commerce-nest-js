@@ -30,4 +30,32 @@ export class OtpRepository extends BaseRepository<OtpDocument> {
         .exec()
     }
 
+    async incrementAttempts(
+        otpId: Types.ObjectId
+    ): Promise<void>{
+        await this.model.updateOne(
+            {_id: otpId},
+            {
+                $inc: {attempts: 1}
+            }
+        ).exec()
+    }
+
+    async markAsUsed(
+        otpId: Types.ObjectId
+    ): Promise<void> {
+        await this.model.updateOne(
+            {
+                _id: otpId
+            },
+            {
+                $set: {
+                    isUsed: true
+                }
+            }
+        ).exec()
+    }
+
+
+
 }

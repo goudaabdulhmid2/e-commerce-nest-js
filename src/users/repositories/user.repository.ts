@@ -12,8 +12,12 @@ export class UserRepository extends BaseRepository <UserDocument>{
         super(userModel);
     }
 
-    async findByEmail(email: string): Promise<UserDocument | null> {
+    async findByEmailWithPassword(email: string): Promise<UserDocument | null> {
         return this.model.findOne({ email }).select('+password').exec();
+    }
+
+    async findByEmail(email: string): Promise<UserDocument | null> {
+        return this.model.findOne({ email }).exec();
     }
 
     // Check whether a user with the given email already exists.

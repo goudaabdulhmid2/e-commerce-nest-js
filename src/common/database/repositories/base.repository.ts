@@ -1,11 +1,11 @@
-import { Model, QueryFilter } from "mongoose";
+import { Model, QueryFilter, Types } from "mongoose";
 
 export abstract class BaseRepository<T> {
 
     constructor(protected readonly model: Model<T>) {}
 
 
-    async findById(id: string): Promise<T | null> {
+    async findById(id: Types.ObjectId): Promise<T | null> {
         return this.model.findById(id).exec();
     }
 
@@ -21,11 +21,11 @@ export abstract class BaseRepository<T> {
         return this.model.create(data);
     }
 
-    async update(id: string, data: Partial<T>): Promise<T | null> {
+    async update(id: Types.ObjectId, data: Partial<T>): Promise<T | null> {
         return this.model.findByIdAndUpdate(id, data, { new: true }).exec();
     }
 
-    async delete(id: string): Promise<T | null> {
+    async delete(id: Types.ObjectId): Promise<T | null> {
         return this.model.findByIdAndDelete(id).exec();
     }
     

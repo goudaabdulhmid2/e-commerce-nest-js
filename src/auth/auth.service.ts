@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { OtpRepository } from './repositories/otp.repository';
 import { PasswordService } from 'src/common/security/password/password.service';
 import { OtpTypes } from './enums/otpType.enum';
@@ -11,12 +11,12 @@ import { AuthMapper } from './mappers/auth.mapper';
 import { EncryptionService } from 'src/common/security/encryption/encryption.service';
 import { OtpService } from './services/otp.service';
 import { EmailService } from 'src/common/email/email.service';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 
 @Injectable()
 export class AuthService {
 
     constructor(
-        private readonly otpRepository: OtpRepository, 
         private readonly passwordService: PasswordService,
         private readonly userService: UsersService,
         private readonly encryptionService: EncryptionService,
@@ -24,6 +24,32 @@ export class AuthService {
         private readonly emailService: EmailService
     ) {}
 
+    async verifyOtp(
+        verifyOtpDto: VerifyOtpDto
+    ) {
+        const user =
+            await this.userService.findByEmail(
+                verifyOtpDto.email
+            );
+        
+        if(!user){
+            throw new BadRequestException(
+                'Invalid OTP'
+            )
+        }
+
+        await this.otpService.verifyOtp(
+            user._id,
+            verifyOtpDto.otp,
+            verifyOtpDto.otpType,
+        );
+
+        const updatedUser= await this.userService.verifyEmail(
+            user._id
+        )
+
+        return AuthMapper.toSignupResponse(updatedUser!);
+    }
 
     async signup(signupDto: SignupDto){
         const emailExists = 
@@ -72,6 +98,7 @@ export class AuthService {
 
         return AuthMapper.toSignupResponse(user);
     }
+
     
 
 
