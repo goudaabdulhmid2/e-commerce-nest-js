@@ -11,6 +11,7 @@ import { UsersModule } from 'src/users/users.module';
 import { EncryptionModule } from 'src/common/security/encryption/encryption.module';
 import { OtpService } from './services/otp.service';
 import { EmailModule } from 'src/common/email/email.module';
+import { EmailVerificationListener } from './listeners/email-verification.listener';
 
 @Module({
     imports:[
@@ -28,7 +29,8 @@ import { EmailModule } from 'src/common/email/email.module';
         RevokedTokenRepository,
         OtpRepository,
         AuthService,
-        OtpService
+        OtpService,
+        EmailVerificationListener,
     ],
     controllers: [AuthController]
 })

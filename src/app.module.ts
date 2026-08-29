@@ -12,6 +12,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exceptions.filter
 import { UsersService } from './users/users.service';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { EmailModule } from './common/email/email.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { EmailModule } from './common/email/email.module';
         limit:100 // 100 request
       }
     ]),
+    EventEmitterModule.forRoot(),
     UsersModule,
     CategoriesModule,
     SubCategoriesModule,
