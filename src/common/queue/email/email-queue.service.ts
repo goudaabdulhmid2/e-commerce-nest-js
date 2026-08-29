@@ -1,5 +1,5 @@
 import { InjectQueue } from "@nestjs/bullmq";
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { Queue } from "bullmq";
 
 
@@ -7,6 +7,10 @@ import { Queue } from "bullmq";
 
 @Injectable()
 export class EmailQueueService{
+    private readonly logger = new Logger(
+        EmailQueueService.name,
+      );
+
     constructor(
         @InjectQueue('email')
         private readonly emailQueue: Queue
@@ -16,6 +20,11 @@ export class EmailQueueService{
         email: string,
         otp: string,
     ): Promise<void> {
+
+        this.logger.log(
+            `Adding email job for ${email}`,
+        );
+
         // Add a verification email job to the email queue.
         await this.emailQueue.add(
             'verification-email',
@@ -43,5 +52,9 @@ export class EmailQueueService{
   
             }
         )
+
+         this.logger.log(
+            `Email job added for ${email}`,
+        );
     }
 }

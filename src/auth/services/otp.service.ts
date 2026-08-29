@@ -18,9 +18,9 @@ export class OtpService{
         private readonly otpRepository: OtpRepository,
         private readonly passwordService: PasswordService
     ) {
-        this.MAX_ATTEMPTS = this.configService.get<number>('MAX_ATTEMPTS') || 5;
-        this.OTP_EXPIRATION_MINUTES= this.configService.get<number>('OTP_EXPIRATION_MINUTES') || 5;
-        this.OTP_LENGTH= this.configService.get<number>('OTP_LENGTH') || 6
+        this.MAX_ATTEMPTS = Number(this.configService.get<number>('MAX_ATTEMPTS', 5));
+        this.OTP_EXPIRATION_MINUTES= Number(this.configService.get<number>('OTP_EXPIRATION_MINUTES', 5));
+        this.OTP_LENGTH= Number(this.configService.get<number>('OTP_LENGTH' ,6));    
     }
 
 

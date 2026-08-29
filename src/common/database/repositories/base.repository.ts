@@ -22,7 +22,7 @@ export abstract class BaseRepository<T> {
     }
 
     async update(id: Types.ObjectId, data: Partial<T>): Promise<T | null> {
-        return this.model.findByIdAndUpdate(id, data, { new: true }).exec();
+        return this.model.findByIdAndUpdate(id, data, {  returnDocument: 'after' }).exec();
     }
 
     async delete(id: Types.ObjectId): Promise<T | null> {
