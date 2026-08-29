@@ -13,6 +13,7 @@ import { UsersService } from './users/users.service';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { EmailModule } from './common/email/email.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { QueueModule } from './common/queue/queue.module';
 
 @Module({
   imports: [
@@ -40,7 +41,8 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     CategoriesModule,
     SubCategoriesModule,
     AuthModule,
-    EmailModule
+    EmailModule,
+    QueueModule
     
   ],
   providers: [
