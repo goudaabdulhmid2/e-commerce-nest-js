@@ -3,7 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { OtpRepository } from "../repositories/otp.repository";
 import { PasswordService } from "src/common/security/password/password.service";
 import { randomInt } from "crypto";
-import { Types } from "mongoose";
+import { ClientSession, Types } from "mongoose";
 import { OtpTypes } from "../enums/otpType.enum";
 
 
@@ -77,7 +77,8 @@ export class OtpService{
 
     async createOtp(
         userId: Types.ObjectId,
-        otpType: OtpTypes
+        otpType: OtpTypes,
+        session?: ClientSession
     ) {
 
         const otp = this.generateOtp();
@@ -95,7 +96,9 @@ export class OtpService{
             otp: hashedOtp,
             otpType,
             expiresAt
-        })
+        },
+        session
+    )
 
         return {
             otp,
@@ -104,7 +107,9 @@ export class OtpService{
     
 
     private generateOtp(): string {
-        const number = randomInt(0, 1_000_000);
+        const max = 10 ** this.OTP_LENGTH;
+
+        const number = randomInt(0, max);
 
 
         return number.toString().padStart(

@@ -28,4 +28,6 @@ export class UserRepository extends BaseRepository <UserDocument>{
 
         return !!user;
     }
+
+    
 }

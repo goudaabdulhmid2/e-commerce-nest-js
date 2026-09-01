@@ -13,6 +13,8 @@ import { OtpService } from './services/otp.service';
 import { EmailModule } from 'src/common/email/email.module';
 import { EmailVerificationListener } from './listeners/email-verification.listener';
 import { QueueModule } from 'src/common/queue/queue.module';
+import { OutboxModule } from 'src/common/outbox/outbox.module';
+import { DatabaseModule } from 'src/common/database/database.module';
 
 @Module({
     imports:[
@@ -21,6 +23,8 @@ import { QueueModule } from 'src/common/queue/queue.module';
         UsersModule,
         EmailModule,
         QueueModule,
+        OutboxModule,
+        DatabaseModule,
         // Register Schema in Module
         MongooseModule.forFeature([
             { name:RevokedToken.name, schema: RevokedTokenSchema },

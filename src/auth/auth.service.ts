@@ -1,9 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { OtpRepository } from './repositories/otp.repository';
 import { PasswordService } from 'src/common/security/password/password.service';
 import { OtpTypes } from './enums/otpType.enum';
-import { Types } from 'mongoose';
-import { OtpDocument } from './schemas/otp.schema/otp.schema';
 import { UsersService } from 'src/users/users.service';
 import { SignupDto } from './dto/signup.dto';
 import { CreateUserData } from 'src/users/types/create-user.type';
@@ -15,6 +12,8 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EmailVerificationRequestEvent } from './events/email-verification-requested.event';
 import { EmailQueueService } from 'src/common/queue/email/email-queue.service';
+import { TransactionService } from 'src/common/database/transaction.service';
+import { OutboxRepository } from 'src/common/outbox/repositories/outbox.repository';
 
 @Injectable()
 export class AuthService {
@@ -24,9 +23,10 @@ export class AuthService {
         private readonly userService: UsersService,
         private readonly encryptionService: EncryptionService,
         private readonly otpService: OtpService,
-        private readonly emailService: EmailService,
         // private readonly eventEmitter: EventEmitter2,
-        private readonly emailQueueService: EmailQueueService
+        private readonly emailQueueService: EmailQueueService,
+        private readonly transactionService: TransactionService,
+        private readonly outboxRepository: OutboxRepository
     ) {}
 
     async verifyOtp(
@@ -43,17 +43,23 @@ export class AuthService {
             )
         }
 
+
         await this.otpService.verifyOtp(
             user._id,
             verifyOtpDto.otp,
             verifyOtpDto.otpType,
         );
 
-        const updatedUser= await this.userService.verifyEmail(
-            user._id
-        )
+        if (
+             verifyOtpDto.otpType ===
+             OtpTypes.EMAIL_VERIFICATION
+        ) {
+                const updatedUser =
+                    await this.userService.verifyEmail(user._id);
 
-        return AuthMapper.toSignupResponse(updatedUser!);
+                return AuthMapper.toSignupResponse(updatedUser!);
+            }
+
     }
 
     async signup(signupDto: SignupDto) {
@@ -87,14 +93,48 @@ export class AuthService {
             dateOfBirth: signupDto.dateOfBirth,
         };
 
+        const result = 
+            await this.transactionService.run(
+                async(session) => {
+                    // Create the user inside the transaction.
+                    const user =
+                        await this.userService.create(
+                            userData,
+                            session
+                        );
 
-        const user = await this.userService.create(userData);
+                    // Create the verification OTP inside
+                    // the same transaction.
+                    const {otp} = 
+                        await this.otpService.createOtp(
+                            user._id, 
+                            OtpTypes.EMAIL_VERIFICATION,
+                            session
+                        );
 
-        // Genrate and store the email verification OTP
-        const {otp} = await this.otpService.createOtp(
-            user._id, 
-            OtpTypes.EMAIL_VERIFICATION
-        );
+
+                    // Store the email event in the Outbox
+                    // inside the same MongoDB transaction.
+                    await this.outboxRepository.create(
+                        {
+                            type: 'EMAIL_VERIFICATION',
+                            payload: {
+                                email: user.email,
+                                otp
+                            },
+                        },
+                        session
+                    );
+
+                    return {
+                        user,
+                        otp
+                    }
+                    
+                }
+            )
+
+
 
         // Publish an event requesting an email verification message.
         // The listener will handle sending the actual email.
@@ -107,14 +147,14 @@ export class AuthService {
         //     )
         // )
 
-        // Add an email verification job to the queue.
-        // The actual email sending will be handled by a worker.
+       // The MongoDB transaction has already committed here.
+       // Only now should we publish/send the queue job.
         await this.emailQueueService.addVerificationEmail(
-            user.email,
-            otp
+            result.user.email,
+            result.otp
         )
 
-        return AuthMapper.toSignupResponse(user);
+        return AuthMapper.toSignupResponse(result.user);
     }
 
     

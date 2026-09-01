@@ -1,4 +1,4 @@
-import { Model, QueryFilter, Types } from "mongoose";
+import { ClientSession, Model, QueryFilter, Types } from "mongoose";
 
 export abstract class BaseRepository<T> {
 
@@ -17,8 +17,13 @@ export abstract class BaseRepository<T> {
         return this.model.find(filter).exec();
     }
 
-    async create(data: Partial<T>): Promise<T> {   
-        return this.model.create(data);
+    async create(data: Partial<T>, session?: ClientSession): Promise<T> {   
+        const [document] =
+            await this.model.create(
+                [data as any],
+                {session}
+            )
+        return document;
     }
 
     async update(id: Types.ObjectId, data: Partial<T>): Promise<T | null> {
