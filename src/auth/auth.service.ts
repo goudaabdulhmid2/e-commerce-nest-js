@@ -7,11 +7,7 @@ import { CreateUserData } from 'src/users/types/create-user.type';
 import { AuthMapper } from './mappers/auth.mapper';
 import { EncryptionService } from 'src/common/security/encryption/encryption.service';
 import { OtpService } from './services/otp.service';
-import { EmailService } from 'src/common/email/email.service';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { EmailVerificationRequestEvent } from './events/email-verification-requested.event';
-import { EmailQueueService } from 'src/common/queue/email/email-queue.service';
 import { TransactionService } from 'src/common/database/transaction.service';
 import { OutboxRepository } from 'src/common/outbox/repositories/outbox.repository';
 
@@ -24,9 +20,8 @@ export class AuthService {
         private readonly encryptionService: EncryptionService,
         private readonly otpService: OtpService,
         // private readonly eventEmitter: EventEmitter2,
-        private readonly emailQueueService: EmailQueueService,
         private readonly transactionService: TransactionService,
-        private readonly outboxRepository: OutboxRepository
+        private readonly outboxRepository: OutboxRepository,
     ) {}
 
     async verifyOtp(
@@ -147,12 +142,7 @@ export class AuthService {
         //     )
         // )
 
-       // The MongoDB transaction has already committed here.
-       // Only now should we publish/send the queue job.
-        await this.emailQueueService.addVerificationEmail(
-            result.user.email,
-            result.otp
-        )
+       
 
         return AuthMapper.toSignupResponse(result.user);
     }

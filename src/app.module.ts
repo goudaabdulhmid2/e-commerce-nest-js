@@ -15,6 +15,7 @@ import { EmailModule } from './common/email/email.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { QueueModule } from './common/queue/queue.module';
 import { envValidationSchema } from './config/env.validtion';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { envValidationSchema } from './config/env.validtion';
         limit:100 // 100 request
       }
     ]),
+    ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     UsersModule,
     CategoriesModule,

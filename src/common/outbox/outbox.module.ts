@@ -6,9 +6,12 @@ import {
   OutboxSchema,
 } from './schemas/outbox.schema';
 import { OutboxRepository } from './repositories/outbox.repository';
+import { QueueModule } from '../queue/queue.module';
+import { OutboxPublisherService } from './services/outbox-publisher.service';
 
 @Module({
   imports: [
+    QueueModule,
     MongooseModule.forFeature([
       {
         name: Outbox.name,
@@ -19,10 +22,12 @@ import { OutboxRepository } from './repositories/outbox.repository';
 
   providers: [
     OutboxRepository,
+    OutboxPublisherService
   ],
 
   exports: [
     OutboxRepository,
+    OutboxPublisherService
   ],
 })
 export class OutboxModule {}

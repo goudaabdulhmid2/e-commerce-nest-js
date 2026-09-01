@@ -47,6 +47,11 @@ export class Outbox{
     })
     processedAt!: Date
 
+    @Prop({
+        type: Date
+    })
+    lockedAt?: Date;
+
 
 
 }
