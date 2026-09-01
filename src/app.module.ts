@@ -14,12 +14,19 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { EmailModule } from './common/email/email.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { QueueModule } from './common/queue/queue.module';
+import { envValidationSchema } from './config/env.validtion';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validationSchema: envValidationSchema,
+
+      validationOptions:{
+        allowUnknown: true,
+        abortEarly: false,
+      }
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],

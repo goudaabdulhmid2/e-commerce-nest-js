@@ -21,11 +21,10 @@ export class EmailService {
         'MAIL_HOST',
       ),
 
-      port: Number(
-        this.configService.getOrThrow<string>(
+      port: 
+        this.configService.getOrThrow<number>(
           'MAIL_PORT',
         ),
-      ),
 
       secure:
         this.configService.getOrThrow<string>(
