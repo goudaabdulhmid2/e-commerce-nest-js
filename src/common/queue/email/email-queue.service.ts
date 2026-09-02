@@ -31,7 +31,8 @@ export class EmailQueueService{
             'verification-email',
             {
                 email,
-                otp
+                otp,
+                outboxEventId
             },
             {
                 // Use the Outbox Event ID as the unique BullMQ Job ID.

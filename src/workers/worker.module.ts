@@ -2,6 +2,7 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { EmailModule } from "src/common/email/email.module";
+import { IdIdempotencyModule } from "src/common/idempotency/idempotency.module";
 import { EmailProcessor } from "src/common/queue/email/email.processor";
 import { envValidationSchema } from "src/config/env.validtion";
 
@@ -9,6 +10,9 @@ import { envValidationSchema } from "src/config/env.validtion";
 
 @Module({
     imports: [
+        EmailModule,
+        IdIdempotencyModule,
+        
         ConfigModule.forRoot({
             isGlobal: true,
             envFilePath: '.env',
@@ -20,7 +24,6 @@ import { envValidationSchema } from "src/config/env.validtion";
         },
         }),
         
-        EmailModule,
 
         BullModule.forRootAsync({
             imports:[ConfigModule],
