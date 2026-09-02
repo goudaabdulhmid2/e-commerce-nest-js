@@ -18,9 +18,23 @@ export class OutboxRepository extends BaseRepository<OutboxDocument>{
 
 
     async claimPendingEvent(): Promise<OutboxDocument | null>{
+        const lockExpiration = new Date(
+            Date.now() - 2 * 60 * 1000
+        )
         return this.model.findOneAndUpdate(
             {
-                status: OutboxStatus.PENDING
+                $or: [
+                    {
+                        status: OutboxStatus.PENDING
+                    },
+                    {
+                        status: OutboxStatus.PROCESSING,
+                        lockedAt: {
+                            $lt: lockExpiration,
+                        }
+                    }
+                ]
+                
             },
             {
                 $set: {
@@ -53,6 +67,9 @@ export class OutboxRepository extends BaseRepository<OutboxDocument>{
                 $set:{
                     status: OutboxStatus.PROCESSED,
                     processedAt: new Date()
+                },
+                $unset: {
+                    lockedAt: 1
                 }
             }
         )
@@ -70,6 +87,9 @@ export class OutboxRepository extends BaseRepository<OutboxDocument>{
                 $set:{
                     status: OutboxStatus.FAILD,
                    
+                },
+                $unset: {
+                    lockedAt: 1
                 }
             }
         )

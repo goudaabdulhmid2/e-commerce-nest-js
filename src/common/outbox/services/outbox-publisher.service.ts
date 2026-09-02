@@ -17,6 +17,9 @@ export class OutboxPublisherService {
     // Every 5 seconds => check Outbox => find PENDING event => publish to BullMQ
     @Cron('*/5 * * * * *')
     async publishPendingEvents(): Promise<void> {
+        const lockExpiration = new Date(
+            Date.now() - 2 * 60 * 1000
+        )
         const event =
            await this.outboxRepository.claimPendingEvent();
 
@@ -37,12 +40,21 @@ export class OutboxPublisherService {
                     email: string,
                     otp: string
                 };
+                
+                this.logger.log(
+                    `${event.status} | ${event.lockedAt} ${event.lockedAt ? new Date(event.lockedAt) < lockExpiration : false}`
+                )
 
                 await this.emailQueueService
                     .addVerificationEmail(
                         email,
-                        otp
+                        otp,
+                        event._id.toString()
                     )
+
+                    
+
+
                 await this.outboxRepository.markAsProcessed(
                     event._id
                 )

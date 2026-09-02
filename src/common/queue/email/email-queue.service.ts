@@ -19,6 +19,7 @@ export class EmailQueueService{
     async addVerificationEmail(
         email: string,
         otp: string,
+        outboxEventId: string
     ): Promise<void> {
 
         this.logger.log(
@@ -33,6 +34,9 @@ export class EmailQueueService{
                 otp
             },
             {
+                // Use the Outbox Event ID as the unique BullMQ Job ID.
+                jobId: `outbox-${outboxEventId}`,
+
               // Retry the job up to 3 times if processing fails.
               attempts: 3,
               // Wait before retrying and increase the delay
