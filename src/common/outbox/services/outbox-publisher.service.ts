@@ -1,79 +1,75 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { OutboxRepository } from "../repositories/outbox.repository";
-import { EmailQueueService } from "src/common/queue/email/email-queue.service";
-import { Cron } from "@nestjs/schedule";
+import { Injectable, Logger } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 
+import { OutboxRepository } from '../repositories/outbox.repository';
+import { EmailQueueService } from 'src/common/queue/email/email-queue.service';
 
 @Injectable()
 export class OutboxPublisherService {
-    private readonly logger = 
-        new Logger(OutboxPublisherService.name)
-    
-    constructor(
-        private readonly outboxRepository: OutboxRepository,
-        private readonly emailQueueService: EmailQueueService
-    ){}
+  private readonly logger =
+    new Logger(OutboxPublisherService.name);
 
-    // Every 5 seconds => check Outbox => find PENDING event => publish to BullMQ
-    @Cron('*/5 * * * * *')
-    async publishPendingEvents(): Promise<void> {
-        const lockExpiration = new Date(
-            Date.now() - 2 * 60 * 1000
-        )
-        const event =
-           await this.outboxRepository.claimPendingEvent();
+  constructor(
+    private readonly outboxRepository: OutboxRepository,
+    private readonly emailQueueService: EmailQueueService,
+  ) {}
 
-        if(!event){
-            return;
-        }
+  // Every 5 seconds => claim one Outbox event => publish it to BullMQ.
+  @Cron('*/5 * * * * *')
+  async publishPendingEvents(): Promise<void> {
+    // Atomically claim a PENDING event or recover an expired PROCESSING event.
+    const event =
+      await this.outboxRepository.claimPendingEvent();
 
-        try{
-            this.logger.log(
-                `Publishing outbox event ${event._id}`
-            )
-
-            if(event.type === 'EMAIL_VERIFICATION'){
-                const {
-                    email,
-                    otp,
-                } = event.payload as {
-                    email: string,
-                    otp: string
-                };
-                
-                this.logger.log(
-                    `${event.status} | ${event.lockedAt} ${event.lockedAt ? new Date(event.lockedAt) < lockExpiration : false}`
-                )
-
-                await this.emailQueueService
-                    .addVerificationEmail(
-                        email,
-                        otp,
-                        event._id.toString()
-                    )
-
-                    
-
-
-                await this.outboxRepository.markAsProcessed(
-                    event._id
-                )
-
-                this.logger.log(
-                `Outbox event ${event._id} processed`,
-                     );
-            }
-        }catch(error){
-            this.logger.error(
-            `Failed to publish outbox event ${event._id}`,
-            error,
-        );
-
-        await this.outboxRepository.markAsFailed(
-            event._id,
-        );
-
-        throw error;
-        }
+    if (!event) {
+      return;
     }
+
+    try {
+      this.logger.log(
+        `Publishing outbox event ${event._id}`,
+      );
+
+      // Publish email verification events to BullMQ.
+      if (event.type === 'EMAIL_VERIFICATION') {
+        const { email, otp } = event.payload as {
+          email: string;
+          otp: string;
+        };
+
+        await this.emailQueueService.addVerificationEmail(
+          email,
+          otp,
+          event._id.toString(),
+        );
+
+        // Mark the event as processed after publishing it to BullMQ.
+        await this.outboxRepository.markAsProcessed(
+          event._id,
+        );
+  
+        this.logger.log(
+          `Outbox event ${event._id} processed`,
+        );
+
+      } else {
+        throw new Error(
+            `Unsupported outbox event type: ${event.type}`,
+        );
+        }
+
+    } catch (error) {
+      this.logger.error(
+        `Failed to publish outbox event ${event._id}`,
+        error,
+      );
+
+      // Make the event available for retry.
+      await this.outboxRepository.markAsFailed(
+        event._id,
+      );
+
+      throw error;
+    }
+  }
 }

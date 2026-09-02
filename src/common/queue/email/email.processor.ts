@@ -46,6 +46,8 @@ export class EmailProcessor extends WorkerHost {
                 outboxEventId: string
             }
 
+            
+
             // Check whether this event was already processed.
             const alreadyProcessed = 
                 await this.processedEventRepository

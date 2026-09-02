@@ -16,6 +16,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { QueueModule } from './common/queue/queue.module';
 import { envValidationSchema } from './config/env.validtion';
 import { ScheduleModule } from '@nestjs/schedule';
+import { DatabaseModule } from './common/database/database.module';
 
 @Module({
   imports: [
@@ -29,15 +30,7 @@ import { ScheduleModule } from '@nestjs/schedule';
         abortEarly: false,
       }
     }),
-    MongooseModule.forRootAsync({
-      imports: [ConfigModule],
-
-      inject: [ConfigService],
-
-      useFactory: (configService: ConfigService) => ({
-        uri: configService.getOrThrow<string>('DB_URL'),
-      }),
-    }),
+    DatabaseModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60_000, // 60 sec
@@ -64,7 +57,6 @@ import { ScheduleModule } from '@nestjs/schedule';
       useClass: GlobalExceptionFilter
     },
     AppService,
-    UsersService
   ],
 
   controllers: [AppController],

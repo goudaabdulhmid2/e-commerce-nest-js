@@ -4,15 +4,15 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { EmailQueueService } from "./email/email-queue.service";
 import { EmailProcessor } from "./email/email.processor";
 import { EmailModule } from "../email/email.module";
-import { IdIdempotencyModule } from "../idempotency/idempotency.module";
+import { IdempotencyModule } from "../idempotency/idempotency.module";
 
 
 
 @Module({
     imports: [
         EmailModule,
-        IdIdempotencyModule,
-        
+        IdempotencyModule,
+
         BullModule.forRootAsync({
             imports:[ConfigModule],
             inject:[ConfigService],

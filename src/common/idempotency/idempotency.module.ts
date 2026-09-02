@@ -18,4 +18,4 @@ import { ProcessedEventRepository } from "./repositories/processed-event.reposit
         ProcessedEventRepository
     ]
 })
-export class IdIdempotencyModule {}
+export class IdempotencyModule {}
