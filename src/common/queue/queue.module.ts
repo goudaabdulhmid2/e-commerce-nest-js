@@ -31,7 +31,6 @@ import { IdempotencyModule } from "../idempotency/idempotency.module";
     ],
     providers: [
         EmailQueueService,
-        EmailProcessor
     ],
     exports: [
         EmailQueueService
