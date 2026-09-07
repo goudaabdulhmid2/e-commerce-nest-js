@@ -138,6 +138,28 @@ export class OutboxRepository extends BaseRepository<OutboxDocument>{
         )
     }
 
+    async markdAsFailed(
+        id: Types.ObjectId,
+        lastError?: string
+    ): Promise<void> {
+        await this.model.updateOne(
+            {
+                _id:id,
+                status: OutboxStatus.PROCESSING
+            },
 
+            {
+                $set:{
+                status: OutboxStatus.FAILED,
+
+                ...(lastError? {lastError} : {} )
+            },
+            $unset:{
+                lockedAt: 1,
+                nextAttemptAt: 1
+            }
+        }
+        )
+    }
 
 }
