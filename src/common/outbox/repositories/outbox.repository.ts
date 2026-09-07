@@ -162,4 +162,39 @@ export class OutboxRepository extends BaseRepository<OutboxDocument>{
         )
     }
 
+    // Move a failed Outbox event back to PENDING so it can be retried.
+    async retryFailedEvent(
+        id: Types.ObjectId,
+    ): Promise<void> {
+
+        // Update only the specified event if it is currently FAILED.
+        await this.model.updateOne(
+            {
+            _id: id,
+            status: OutboxStatus.FAILED,
+            },
+
+            // Reset the event so the publisher can process it again.
+            {
+            $set: {
+                status: OutboxStatus.PENDING,
+
+                // Allow the event to be retried immediately.
+                nextAttemptAt: new Date(),
+
+                // Clear the previous error because a new retry cycle starts.
+                lastError: undefined,
+
+                // Reset the number of publishing attempts.
+                attempts: 0,
+            },
+
+            // Make sure there is no old processing lock.
+            $unset: {
+                lockedAt: 1,
+            },
+            },
+        );
+    }
+
 }
