@@ -65,11 +65,11 @@ export class OutboxPublisherService {
       );
 
       // Make the event available for retry.
-      await this.outboxRepository.markAsFailed(
+      await this.outboxRepository.markAsPending(
         event._id,
       );
 
-      throw error;
+      return;
     }
   }
 }

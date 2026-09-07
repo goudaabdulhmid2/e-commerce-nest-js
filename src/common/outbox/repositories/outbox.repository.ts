@@ -75,18 +75,17 @@ export class OutboxRepository extends BaseRepository<OutboxDocument>{
         )
     }
 
-    async markAsFailed(
+    async markAsPending(
         id: Types.ObjectId
-    ): Promise<void>{
+    ){
         await this.model.updateOne(
             {
                 _id:id,
                 status: OutboxStatus.PROCESSING
             },
             {
-                $set:{
-                    status: OutboxStatus.FAILD,
-                   
+                $set: {
+                    status: OutboxStatus.PENDING
                 },
                 $unset: {
                     lockedAt: 1
@@ -94,5 +93,7 @@ export class OutboxRepository extends BaseRepository<OutboxDocument>{
             }
         )
     }
+
+
 
 }

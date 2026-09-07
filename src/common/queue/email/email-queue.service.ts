@@ -25,7 +25,8 @@ export class EmailQueueService{
         this.logger.log(
             `Adding email job for ${email}`,
         );
-
+  
+        
         // Add a verification email job to the email queue.
         await this.emailQueue.add(
             'verification-email',
