@@ -52,6 +52,14 @@ export class Outbox{
     })
     lockedAt?: Date;
 
+    @Prop({
+        index: true
+    })
+    nextAttemptAt?: Date
+
+    @Prop()
+    lastError?: string
+
 
 
 }

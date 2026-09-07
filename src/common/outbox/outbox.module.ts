@@ -8,6 +8,8 @@ import {
 import { OutboxRepository } from './repositories/outbox.repository';
 import { QueueModule } from '../queue/queue.module';
 import { OutboxPublisherService } from './services/outbox-publisher.service';
+import { OutboxAdminService } from './services/outbox-admin.service';
+import { OutboxAdminController } from './controllers/outbox-admin.controller';
 
 @Module({
   imports: [
@@ -22,7 +24,11 @@ import { OutboxPublisherService } from './services/outbox-publisher.service';
 
   providers: [
     OutboxRepository,
-    OutboxPublisherService
+    OutboxPublisherService,
+    OutboxAdminService
+  ],
+  controllers:[
+    OutboxAdminController
   ],
 
   exports: [
