@@ -64,12 +64,32 @@ export class OutboxPublisherService {
         error,
       );
 
+      const delay = this.calculateBackoff(event.attempts);
+
+      const nextAttemptAt = new Date(
+        Date.now() + delay
+      )
+
       // Make the event available for retry.
       await this.outboxRepository.markAsPending(
         event._id,
+        nextAttemptAt,
+        error instanceof Error 
+          ? error.message
+          : String(error)
       );
 
       return;
     }
+  }
+
+  private calculateBackoff(attempts: number): number {
+    const BASE_DELAY = 5000
+    const MAX_DELAY = 5 * 60 * 1000;
+
+    const delay = 
+      BASE_DELAY * Math.pow(2, attempts - 1);
+
+      return Math.min(delay, MAX_DELAY)
   }
 }
