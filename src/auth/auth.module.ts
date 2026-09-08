@@ -18,6 +18,7 @@ import { DatabaseModule } from 'src/common/database/database.module';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import type { StringValue } from 'ms';
+import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
     imports:[
@@ -53,7 +54,11 @@ import type { StringValue } from 'ms';
         AuthService,
         OtpService,
         EmailVerificationListener,
+        JwtStrategy
     ],
-    controllers: [AuthController]
+    controllers: [AuthController],
+    exports:[
+        JwtModule
+    ]
 })
 export class AuthModule {}
