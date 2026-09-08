@@ -19,6 +19,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import type { StringValue } from 'ms';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { AdminGuard } from './guards/admin.guard';
 
 @Module({
     imports:[
@@ -54,11 +56,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
         AuthService,
         OtpService,
         EmailVerificationListener,
-        JwtStrategy
+        JwtStrategy,
+        JwtAuthGuard,
+        AdminGuard
     ],
     controllers: [AuthController],
     exports:[
-        JwtModule
+        JwtModule,
     ]
 })
 export class AuthModule {}

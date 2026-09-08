@@ -16,17 +16,14 @@ export class OutboxAdminService {
 
   // Retry a failed Outbox event manually.
   async retryFailedEvent(
-    id: string,
+    id: Types.ObjectId,
   ): Promise<void> {
 
-    // Convert the string ID received from the HTTP request
-    // into a MongoDB ObjectId.
-    const eventId = new Types.ObjectId(id);
 
     // Move the FAILED event back to PENDING
     // so the normal Outbox Publisher can process it again.
     await this.outboxRepository.retryFailedEvent(
-      eventId,
+      id,
     );
   }
 }
