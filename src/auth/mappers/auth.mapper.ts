@@ -1,5 +1,6 @@
 import { UserDocument } from "src/users/schemas/user.schema";
 import { SignupResponseDto } from "../dto/signup-response.dto";
+import { LoginResponseDto } from "../dto/login-response.dto";
 
 
 export class AuthMapper {
@@ -18,4 +19,12 @@ export class AuthMapper {
             isEmailVerified: user.isEmailVerified
         }
     }
+    static toLoginResponse(
+    accessToken: string,
+     ): LoginResponseDto {
+        // Return only authentication data to the client.
+        return {
+        accessToken,
+        };
+  }
 }

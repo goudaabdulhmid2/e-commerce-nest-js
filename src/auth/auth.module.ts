@@ -15,6 +15,9 @@ import { EmailVerificationListener } from './listeners/email-verification.listen
 import { QueueModule } from 'src/common/queue/queue.module';
 import { OutboxModule } from 'src/common/outbox/outbox.module';
 import { DatabaseModule } from 'src/common/database/database.module';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import type { StringValue } from 'ms';
 
 @Module({
     imports:[
@@ -30,6 +33,19 @@ import { DatabaseModule } from 'src/common/database/database.module';
             { name:RevokedToken.name, schema: RevokedTokenSchema },
             {name: Otp.name, schema: OtpSchema}
         ]),
+
+        JwtModule.registerAsync({
+            imports: [ConfigModule],
+            inject: [ConfigService],
+            useFactory: (configService: ConfigService) => ({
+                secret: configService.getOrThrow<string>('JWT_ACCESS_SECRET',),
+                signOptions: {
+                    expiresIn: configService.getOrThrow<string>(
+                     'JWT_ACCESS_EXPIRES_IN',
+                    ) as StringValue,
+                }
+            })
+        })
     ],
     providers:[
         RevokedTokenRepository,

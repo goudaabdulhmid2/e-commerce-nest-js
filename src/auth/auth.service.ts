@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PasswordService } from 'src/common/security/password/password.service';
 import { OtpTypes } from './enums/otpType.enum';
 import { UsersService } from 'src/users/users.service';
@@ -10,6 +10,9 @@ import { OtpService } from './services/otp.service';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { TransactionService } from 'src/common/database/transaction.service';
 import { OutboxRepository } from 'src/common/outbox/repositories/outbox.repository';
+import { LoginDTO } from './dto/login.dto';
+import { JwtService } from '@nestjs/jwt';
+import { LoginResponseDto } from './dto/login-response.dto';
 
 @Injectable()
 export class AuthService {
@@ -22,6 +25,7 @@ export class AuthService {
         // private readonly eventEmitter: EventEmitter2,
         private readonly transactionService: TransactionService,
         private readonly outboxRepository: OutboxRepository,
+        private readonly jwtService: JwtService 
     ) {}
 
     async verifyOtp(
@@ -145,6 +149,70 @@ export class AuthService {
        
 
         return AuthMapper.toSignupResponse(result.user);
+    }
+
+
+    async validateLogin(
+        loginDto: LoginDTO
+    ){
+        // Find user
+        const user =
+            await this.userService.findByEmailWithPassword(
+                loginDto.email
+            )
+        
+        // Reject the login if the user dose not exist
+        if(!user){
+            throw new UnauthorizedException(
+                'Invalid email or password'
+            )
+        }
+
+        // verify password
+        const isPasswordValid = 
+            await this.passwordService.compare(
+                loginDto.password, 
+                user.password
+            );
+        
+        // Reject if not correct
+        if(!isPasswordValid){
+            throw new UnauthorizedException(
+                'Invalid email or password'
+            )
+        }
+
+        // Prevent unverified users from obtainig a normal authenticated session
+        if(!user.isEmailVerified){
+            throw new ForbiddenException(
+                'Email verification is required'
+            )
+        }
+
+        return user;
+    }
+
+
+    async login(
+        loginDto: LoginDTO
+    ): Promise<LoginResponseDto>{
+
+        // Validate
+        const user = await this.validateLogin(loginDto);
+
+        // Create JWT payload
+        const payload = {
+            sub: user._id.toString(),
+            role: user.role
+        }
+
+        // Genrate a signed access token.
+        const accessToken = await this.jwtService.signAsync(
+            payload
+        )
+
+
+        return AuthMapper.toLoginResponse(accessToken)
     }
 
     

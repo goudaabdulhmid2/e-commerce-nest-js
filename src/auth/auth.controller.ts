@@ -4,6 +4,8 @@ import { SignupDto } from './dto/signup.dto';
 import { SignupResponseDto } from './dto/signup-response.dto';
 import { Throttle } from '@nestjs/throttler';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { LoginDTO } from './dto/login.dto';
+import { LoginResponseDto } from './dto/login-response.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -31,6 +33,13 @@ export class AuthController {
     })
     signup(@Body() signupDto: SignupDto): Promise<SignupResponseDto>{
         return this.authService.signup(signupDto)
+    }
+
+    @Post('login')
+    async login(
+        @Body() loginDto: LoginDTO
+    ): Promise<LoginResponseDto> {
+        return this.authService.login(loginDto)
     }
 
 }

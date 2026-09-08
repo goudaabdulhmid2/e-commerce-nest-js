@@ -13,7 +13,7 @@ export class UserRepository extends BaseRepository <UserDocument>{
     }
 
     async findByEmailWithPassword(email: string): Promise<UserDocument | null> {
-        return this.model.findOne({ email }).select('+password').exec();
+        return this.model.findOne({ email, isDeleted:false }).select('+password').exec();
     }
 
     async findByEmail(email: string): Promise<UserDocument | null> {
