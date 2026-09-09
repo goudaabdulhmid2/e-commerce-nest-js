@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { SignupResponseDto } from './dto/signup-response.dto';
@@ -6,6 +6,7 @@ import { Throttle } from '@nestjs/throttler';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { LoginDTO } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
+import type { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -37,9 +38,11 @@ export class AuthController {
 
     @Post('login')
     async login(
-        @Body() loginDto: LoginDTO
+        @Body() loginDto: LoginDTO,
+        @Res({passthrough: true})
+        response: Response
     ): Promise<LoginResponseDto> {
-        return this.authService.login(loginDto)
+        return this.authService.login(loginDto, response)
     }
 
 }

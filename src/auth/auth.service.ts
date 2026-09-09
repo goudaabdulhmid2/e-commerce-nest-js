@@ -13,9 +13,16 @@ import { OutboxRepository } from 'src/common/outbox/repositories/outbox.reposito
 import { LoginDTO } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { LoginResponseDto } from './dto/login-response.dto';
+import { RefreshTokenService } from './services/refresh-token.service';
+import { SessionRepository } from './repositories/session.repository';
+import { RefreshTokenRepository } from './repositories/refresh-token.repository';
+import { Types } from 'mongoose';
+import { Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
+    private readonly REFRESH_TOKEN_EXPIRES;
 
     constructor(
         private readonly passwordService: PasswordService,
@@ -25,8 +32,14 @@ export class AuthService {
         // private readonly eventEmitter: EventEmitter2,
         private readonly transactionService: TransactionService,
         private readonly outboxRepository: OutboxRepository,
-        private readonly jwtService: JwtService 
-    ) {}
+        private readonly jwtService: JwtService,
+        private readonly refreshTokenService: RefreshTokenService,
+        private readonly sessionRepository: SessionRepository,
+        private readonly refreshTokenRepository: RefreshTokenRepository,
+        private readonly configService: ConfigService
+    ) {
+        this.REFRESH_TOKEN_EXPIRES = this.configService.getOrThrow<number>('REFRESH_TOKEN_EXPIRES')
+    }
 
     async verifyOtp(
         verifyOtpDto: VerifyOtpDto
@@ -152,7 +165,48 @@ export class AuthService {
     }
 
 
-    async validateLogin(
+    async login(
+        loginDto: LoginDTO,
+        response: Response
+    ): Promise<LoginResponseDto>{
+
+        // Validate
+        const user = await this.validateLogin(loginDto);
+
+        // Create JWT payload
+        const payload = {
+            sub: user._id.toString(),
+            role: user.role
+        }
+        
+        // Genrate a signed access token.
+        const accessToken = await this.jwtService.signAsync(
+            payload
+        )
+
+        // Create a new refresh session and its first refresh token.
+        const refreshToken = 
+            await this.createRefreshSession(user._id)
+
+        // Store the refresh token inside a secure HTTP-only cookie.
+        response.cookie(
+            'refresh_token',
+            refreshToken,
+            {
+                httpOnly: true,
+                secure: true,
+                sameSite: 'strict',
+                path: '/auth',
+                maxAge: this.REFRESH_TOKEN_EXPIRES
+            }
+        )
+        
+        
+        return AuthMapper.toLoginResponse(accessToken)
+    }
+
+
+    private async validateLogin(
         loginDto: LoginDTO
     ){
         // Find user
@@ -193,27 +247,45 @@ export class AuthService {
     }
 
 
-    async login(
-        loginDto: LoginDTO
-    ): Promise<LoginResponseDto>{
+    private async createRefreshSession(
+        userId: Types.ObjectId,
+    ): Promise<string> {
+        // Generate the raw refresh token that will be sent to the client.
+        const rawRefreshToken =
+            this.refreshTokenService.generateToken();
 
-        // Validate
-        const user = await this.validateLogin(loginDto);
+        // Generate a unique identifier for this refresh token.
+        const tokenId =
+            this.refreshTokenService.generateTokenId();
 
-        // Create JWT payload
-        const payload = {
-            sub: user._id.toString(),
-            role: user.role
-        }
+        // Hash the refresh token before storing it in the database.
+        const tokenHash =
+            this.refreshTokenService.hashToken(
+            rawRefreshToken,
+            );
 
-        // Genrate a signed access token.
-        const accessToken = await this.jwtService.signAsync(
-            payload
-        )
+        // Define the lifetime of the refresh session.
+        const expiresAt = new Date(
+            Date.now() + this.REFRESH_TOKEN_EXPIRES,
+        );
 
+        // Create a new authentication session for this login.
+        const session = await this.sessionRepository.create({
+            userId,
+            expiresAt,
+        });
 
-        return AuthMapper.toLoginResponse(accessToken)
-    }
+        // Create the first refresh token belonging to this session.
+        await this.refreshTokenRepository.create({
+            sessionId: session._id,
+            tokenId,
+            tokenHash,
+            expiresAt,
+        });
+
+        // Return the raw refresh token to the login flow.
+        return rawRefreshToken;
+}
 
     
 

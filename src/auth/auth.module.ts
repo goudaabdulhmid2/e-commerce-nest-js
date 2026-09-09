@@ -21,6 +21,11 @@ import type { StringValue } from 'ms';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AdminGuard } from './guards/admin.guard';
+import { Session, SessionSchema } from './schemas/session.schema';
+import { RefreshToken, RefreshTokenSchema } from './schemas/refresh-token.schema';
+import { SessionRepository } from './repositories/session.repository';
+import { RefreshTokenService } from './services/refresh-token.service';
+import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 
 @Module({
     imports:[
@@ -34,7 +39,9 @@ import { AdminGuard } from './guards/admin.guard';
         // Register Schema in Module
         MongooseModule.forFeature([
             { name:RevokedToken.name, schema: RevokedTokenSchema },
-            {name: Otp.name, schema: OtpSchema}
+            {name: Otp.name, schema: OtpSchema},
+            {name: Session.name, schema: SessionSchema},
+            {name: RefreshToken.name, schema: RefreshTokenSchema}
         ]),
 
         JwtModule.registerAsync({
@@ -58,11 +65,17 @@ import { AdminGuard } from './guards/admin.guard';
         EmailVerificationListener,
         JwtStrategy,
         JwtAuthGuard,
-        AdminGuard
+        AdminGuard,
+        SessionRepository,
+        RefreshTokenRepository,
+        RefreshTokenService,
     ],
     controllers: [AuthController],
     exports:[
         JwtModule,
+        SessionRepository,
+        RefreshTokenRepository,
+        RefreshTokenService
     ]
 })
 export class AuthModule {}
