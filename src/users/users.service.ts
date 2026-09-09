@@ -17,6 +17,10 @@ export class UsersService {
         )
     }
 
+    async findUserById (id: Types.ObjectId): Promise<UserDocument | null>{
+        return this.userRepository.findById(id)
+    }
+
     async existsByEmail(email: string): Promise<boolean>{
         return this.userRepository.existsByEmail(email);
     }

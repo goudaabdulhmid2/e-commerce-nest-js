@@ -1,8 +1,10 @@
 import { BadRequestException, ValidationPipe, VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exceptions.filter';
+
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -44,6 +46,7 @@ async function bootstrap() {
       },
     }),
   );
+  app.use(cookieParser())
 
 
   await app.listen(process.env.PORT ?? 3000);

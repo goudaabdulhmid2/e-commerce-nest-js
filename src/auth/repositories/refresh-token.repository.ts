@@ -31,16 +31,16 @@ export class RefreshTokenRepository extends BaseRepository<RefreshTokenDocument>
       .exec();
   }
 
-  async findByTokenHash(
-    tokenHash: string,
-  ): Promise<RefreshTokenDocument | null> {
-    // Find the refresh token using the hash of the raw token.
+  async findByHash(
+  tokenHash: string,
+    ): Promise<RefreshTokenDocument | null> {
+    // Find a refresh token using its stored hash.
     return this.model
-      .findOne({
+        .findOne({
         tokenHash,
-      })
-      .exec();
-  }
+        })
+        .exec();
+    }
 
   async markAsUsed(
     id: Types.ObjectId,
@@ -76,5 +76,27 @@ export class RefreshTokenRepository extends BaseRepository<RefreshTokenDocument>
         },
       },
     );
+  }
+
+  async consumeToken(
+    tokenId: string,
+    replacedByTokenId: string,
+
+  ): Promise<RefreshTokenDocument | null>{
+    // Atomically find an active refresh token and mark it as used.
+    return this.model.findOneAndUpdate({
+        tokenId,
+        usedAt: {$exists: false},
+        revokedAt: {$exists: false},
+        expiresAt: {$gt: new Date()}
+    },{
+        $set:{
+            usedAt: new Date(),
+            replacedByTokenId
+        }
+    },{
+        returnDocument: 'before'
+    }).exec()
+
   }
 }

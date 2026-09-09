@@ -41,6 +41,137 @@ export class AuthService {
         this.REFRESH_TOKEN_EXPIRES = this.configService.getOrThrow<number>('REFRESH_TOKEN_EXPIRES')
     }
 
+    async refresh(
+        refreshToken: string,
+        response: Response
+    ): Promise<LoginResponseDto>{
+       // Reject the request when no refresh token was provided.
+       if(!refreshToken){
+        throw new UnauthorizedException(
+            'Refresh token is required'
+        )
+       }
+
+       // Hash the raw refresh token so it can be safely looked up in the database.
+       const tokenHash = 
+        this.refreshTokenService.hashToken(refreshToken)
+
+        // Find the refresh token record using its hash.
+        const storedToken = 
+            await this.refreshTokenRepository.findByHash(tokenHash)
+
+        // Reject the request when the refresh token does not exist.
+        if(!storedToken){
+            throw new UnauthorizedException(
+                'Invalid refresh token'
+            );
+        }
+
+        // Find the auth session associated with the refresh token
+        const session =
+            await this.sessionRepository.findActiveSession(
+                storedToken.sessionId
+            )
+        
+        // Reject the request when the session is revoked or expired.
+        if(!session){
+            throw new UnauthorizedException(
+                'Session is no longer active'
+            )
+        }
+
+        // Generate the identifier for the new refresh token.
+        const newTokenId = 
+            this.refreshTokenService.generateTokenId()
+        
+        // Atomically consume the current refresh token.
+        const consumedToken = 
+            await this.refreshTokenRepository.consumeToken(
+                storedToken.tokenId,
+                newTokenId
+            )
+        
+        // Detect concurrent refresh requests using the same token.
+        if(!consumedToken){
+            // Revoke the entire session because token reuse was detected.
+            await this.sessionRepository.revoke(
+                session._id
+            );
+
+            // Reject the request because the token was already consumed.
+            throw new UnauthorizedException(
+             'Refresh token reuse detected',
+            );
+        }
+
+        // Generate the new raw refresh token.
+        const newRefreshToken =
+            this.refreshTokenService.generateToken();
+
+        // Hash
+        const newTokenHash = 
+            this.refreshTokenService.hashToken(newRefreshToken);
+
+        // Calculate the expiration time of the new refresh token.
+        const expiresAt = new Date(
+            Date.now() + this.REFRESH_TOKEN_EXPIRES
+        )
+
+        // store the new rfresh token for the same session
+        await this.refreshTokenRepository.create({
+            sessionId: session._id,
+            tokenId: newTokenId,
+            tokenHash: newTokenHash,
+            expiresAt,
+        });
+
+        // Update the session activity timestamp
+        await this.sessionRepository.updateLastUsed(
+            session._id
+        )
+
+        const user =
+            await this.userService.findUserById(
+                session.userId,
+            );
+
+        if (!user || user.isDeleted) {
+            // Reject the refresh request when the user no longer exists or was deleted.
+            throw new UnauthorizedException(
+                'User account is no longer active',
+            );
+        }
+
+        // Build the access token payload
+        const patload = {
+            sub: user._id.toString(),
+            role:user.role
+        }
+
+        // Generate a new short-lived access token.
+        const accessToken = 
+            await this.jwtService.signAsync(patload);
+
+        // Replace the refresh token stored in the HTTP-only cookie.
+        response.cookie(
+            'refresh_token',
+            newRefreshToken,
+            {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'strict',
+            path: '/auth',
+            maxAge: this.REFRESH_TOKEN_EXPIRES,
+            },
+    );
+
+        // Return the new access token to the client.
+        return AuthMapper.toLoginResponse(
+            accessToken,
+        );
+
+    }
+
     async verifyOtp(
         verifyOtpDto: VerifyOtpDto
     ) {
@@ -204,6 +335,7 @@ export class AuthService {
         
         return AuthMapper.toLoginResponse(accessToken)
     }
+
 
 
     private async validateLogin(
