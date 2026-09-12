@@ -1,98 +1,278 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# CommerceCore — Reliable E-Commerce Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+CommerceCore is a production-oriented e-commerce backend built with **NestJS** and **MongoDB**.  
+The project is designed as a **modular monolith** with a separate background worker for asynchronous processing and reliability-focused infrastructure.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Architecture
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
+```text
+                         ┌──────────────────────┐
+                         │       Client         │
+                         └──────────┬───────────┘
+                                    │ HTTP
+                                    ▼
+                         ┌──────────────────────┐
+                         │     NestJS API       │
+                         │                      │
+                         │ Auth / Users /       │
+                         │ Categories / ...     │
+                         └───────┬──────────────┘
+                                 │
+                    ┌────────────┴────────────┐
+                    │                         │
+                    ▼                         ▼
+              ┌───────────┐             ┌───────────┐
+              │  MongoDB  │             │   Redis   │
+              │           │             │           │
+              │ Business  │             │  BullMQ   │
+              │  Data +   │             │   Queue   │
+              │  Outbox   │             └─────┬─────┘
+              └───────────┘                   │
+                                             │ Jobs
+                                             ▼
+                                    ┌──────────────────┐
+                                    │   Worker Process │
+                                    │                  │
+                                    │ Email Processor  │
+                                    └────────┬─────────┘
+                                             │
+                                             ▼
+                                      ┌─────────────┐
+                                      │ SMTP / Email│
+                                      └─────────────┘
 ```
 
-## Compile and run the project
+## Key Features
 
-```bash
-# development
-$ npm run start
+### Authentication & Authorization
 
-# watch mode
-$ npm run start:dev
+- User signup with DTO validation.
+- Email verification using OTP.
+- Password hashing and secure credential validation.
+- JWT-based access-token authentication.
+- Role-based authorization with an `ADMIN` guard.
+- Deleted users are excluded from normal authentication.
+- Short-lived access tokens are used for authenticated API requests.
+- Refresh-token rotation and session-based authentication are planned as the next authentication layer.
 
-# production mode
-$ npm run start:prod
+### Transactional Outbox
+
+The project uses the **Transactional Outbox Pattern** to reliably publish domain events.
+
+```text
+Business Operation
+       │
+       ├── Update business data
+       │
+       └── Create Outbox Event
+                │
+                ▼
+             COMMIT
+                │
+                ▼
+        Outbox Publisher
+                │
+                ▼
+             BullMQ
 ```
 
-## Run tests
+This prevents the classic failure scenario where the database operation succeeds but publishing the asynchronous event fails.
 
-```bash
-# unit tests
-$ npm run test
+The outbox publisher includes:
 
-# e2e tests
-$ npm run test:e2e
+- Atomic event claiming.
+- `PENDING`, `PROCESSING`, `PROCESSED`, and `FAILED` states.
+- Crash recovery for stale `PROCESSING` events.
+- Exponential retry backoff.
+- Maximum automatic retry attempts.
+- Manual recovery of permanently failed events.
 
-# test coverage
-$ npm run test:cov
+### Asynchronous Processing
+
+The API process and Worker process are separated.
+
+```text
+API
+ │
+ └── Publish Job → Redis / BullMQ
+                       │
+                       ▼
+                    Worker
+                       │
+                       ▼
+                 Email Service
+                       │
+                       ▼
+                      SMTP
 ```
 
-## Deployment
+The Worker owns the email processor, keeping background processing independent from the HTTP API.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### Idempotent Consumer
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Processed outbox events are tracked using a dedicated `ProcessedEvent` collection.
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+This protects the consumer against processing the same event more than once when jobs are retried or redelivered.
+
+The system follows an **at-least-once delivery model**. External side effects such as SMTP email delivery cannot be guaranteed to be exactly-once solely through the database.
+
+### Database Transactions
+
+MongoDB transactions are supported through a dedicated `TransactionService`.
+
+Repositories receive the same `ClientSession` so multiple database operations can participate in one transaction.
+
+## Reliability Model
+
+The current email-verification flow is:
+
+```text
+User Signup
+    │
+    ▼
+MongoDB Transaction
+    │
+    ├── Create User
+    ├── Create OTP
+    └── Create Outbox Event
+            │
+            ▼
+          COMMIT
+            │
+            ▼
+     Outbox Publisher
+            │
+            ▼
+        BullMQ / Redis
+            │
+            ▼
+      Email Worker
+            │
+            ▼
+      SMTP Provider
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+If Redis is temporarily unavailable:
 
-## Resources
+```text
+Outbox Event
+     │
+     ▼
+Publisher fails
+     │
+     ▼
+PENDING
+     │
+     ▼
+Exponential Backoff
+     │
+     ▼
+Retry
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+If the maximum publishing attempts are exhausted:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```text
+PENDING
+   │
+   ▼
+PROCESSING
+   │
+   ▼
+Repeated failures
+   │
+   ▼
+FAILED
+   │
+   ▼
+Admin Recovery
+   │
+   ▼
+PENDING
+   │
+   ▼
+Normal Publisher Flow
+```
 
-## Support
+## Project Structure
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```text
+src/
+├── auth/
+├── users/
+├── categories/
+├── sub-categories/
+│
+├── common/
+│   ├── database/
+│   ├── outbox/
+│   └── idempotency/
+│
+└── ...
+```
 
-## Stay in touch
+The project follows a modular structure where business modules own their domain logic while cross-cutting infrastructure is kept under `common`.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## Tech Stack
 
-## License
+- **NestJS**
+- **TypeScript**
+- **MongoDB**
+- **Mongoose**
+- **JWT**
+- **Passport**
+- **BullMQ**
+- **Redis**
+- **Nodemailer**
+- **SMTP**
+- **Docker**
+- **MongoDB Transactions**
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## Design Patterns & Concepts
+
+The project intentionally applies backend engineering concepts beyond basic CRUD:
+
+- Modular Monolith Architecture
+- Repository Pattern
+- DTO Validation
+- JWT Authentication
+- Role-Based Authorization
+- MongoDB Transactions
+- Transactional Outbox Pattern
+- Atomic Event Claiming
+- Exponential Backoff
+- Background Workers
+- Queue-Based Asynchronous Processing
+- Idempotent Consumers
+- At-Least-Once Delivery
+- Failure Recovery
+- Separation of API and Worker Processes
+
+## Reliability Guarantees
+
+The architecture is designed around the following guarantees:
+
+- Business data and outbox events are committed atomically.
+- Failed event publication can be retried.
+- Multiple publisher instances cannot simultaneously claim the same outbox event.
+- Stale processing locks can be recovered after a publisher crash.
+- Failed events can be manually recovered by administrators.
+- Duplicate asynchronous delivery is handled at the consumer level.
+- Email delivery remains at-least-once rather than falsely claiming exactly-once delivery.
+
+## Roadmap
+
+- Refresh Token Sessions
+- Refresh Token Rotation
+- Refresh Token Reuse Detection
+- Secure Logout and Session Revocation
+- Product Management
+- Category & Subcategory Management
+- Cart
+- Orders
+- Payment Integration
+- Inventory Management
+- Redis Caching
+- Observability and Metrics
+- Automated Testing
+- API Documentation
