@@ -79,4 +79,34 @@ export class SessionRepository
       }
     );
   }
+
+  async revokeAllByUserId(
+    userId: Types.ObjectId
+  ): Promise<void> {
+    await this.model.updateMany({
+      userId,
+      revokedAt:{$exists: false}
+    },
+    {
+      $set:{
+        revokedAt: new Date()
+      }
+    }
+  )
+  }
+
+  async findActiveByUserId(
+    userId: Types.ObjectId
+  ): Promise<SessionDocument[]>{
+    
+    return await this.model.
+      find({
+        userId,
+        revokedAt: {$exists: false},
+        expiresAt: {$gt: new Date()}
+      }).sort({
+         lastUsedAt: -1,
+         createdAt: -1
+      }).exec()
+  }
 }

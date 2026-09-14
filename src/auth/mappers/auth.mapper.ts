@@ -1,6 +1,8 @@
 import { UserDocument } from "src/users/schemas/user.schema";
 import { SignupResponseDto } from "../dto/signup-response.dto";
 import { LoginResponseDto } from "../dto/login-response.dto";
+import { SessionDocument } from "../schemas/session.schema";
+import { SessionResponseDto } from "../dto/session-response.dto";
 
 
 export class AuthMapper {
@@ -27,4 +29,28 @@ export class AuthMapper {
         accessToken,
         };
   }
+
+  static toSessionResponse(
+    session: SessionDocument,
+  ): SessionResponseDto {
+    // Map the internal session document to the public API response.
+    return {
+      id: session._id.toString(),
+      createdAt: session._id.getTimestamp(),
+      lastUsedAt: session.lastUsedAt,
+      expiresAt: session.expiresAt,
+    };
+  }
+
+  static toSessionResponseList(
+    sessions: SessionDocument[],
+  ): SessionResponseDto[] {
+    // Map every session document to a public response DTO.
+    return sessions.map((session) =>
+      this.toSessionResponse
+        (session),
+    );
+  }
+
+
 }

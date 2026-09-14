@@ -20,6 +20,9 @@ import { Types } from 'mongoose';
 import { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { RefreshTokenReuseError } from './errors/refresh-token-reuse.error';
+import { RefreshSessionResult } from './interfaces/refresh-session-result.interface';
+import { session } from 'passport';
+import { SessionResponseDto } from './dto/session-response.dto';
 
 @Injectable()
 export class AuthService {
@@ -41,6 +44,42 @@ export class AuthService {
     ) {
         this.REFRESH_TOKEN_EXPIRES = this.configService.getOrThrow<number>('REFRESH_TOKEN_EXPIRES')
     }
+
+    
+
+    async getSessions(
+        userId: Types.ObjectId
+    ): Promise<SessionResponseDto[]> {
+        // Find all
+        const sessions = 
+            await this.sessionRepository.findActiveByUserId(userId);
+        
+        return AuthMapper.toSessionResponseList(
+            sessions
+        )
+    }
+
+    async logoutAll(
+        userId: Types.ObjectId,
+        response: Response
+    ): Promise<void> {
+        // Recoke every active session belongong to the user
+        await this.sessionRepository.revokeAllByUserId(
+            userId
+        )
+
+        // Clear cookie
+        response.clearCookie(
+            'refresh_token',
+            {
+                httpOnly: true,
+                secure: true,
+                sameSite: 'strict',
+                path: '/auth'
+            }
+        )
+    }
+
 
     async logout(
         refreshToken: string,
@@ -137,6 +176,7 @@ export class AuthService {
     );
 
     let userId: Types.ObjectId;
+    let sessionId: Types.ObjectId;
 
     try{
 
@@ -193,11 +233,13 @@ export class AuthService {
                 // Return the session information after the transaction succeeds.
                 return {
                     userId: session.userId,
+                    sessionId: session._id
                 };
             },
             );
 
-        userId = rotationResult.userId
+        userId = rotationResult.userId;
+        sessionId = rotationResult.sessionId
     }catch(error){
         // Revoke the entire session when refresh-token reuse is detected
         if(error instanceof RefreshTokenReuseError){
@@ -234,6 +276,7 @@ export class AuthService {
     const payload = {
         sub: user._id.toString(),
         role: user.role,
+        sid: sessionId
     };
 
     // Generate a new short-lived access token.
@@ -391,10 +434,15 @@ export class AuthService {
         // Validate
         const user = await this.validateLogin(loginDto);
 
+        // Create a new refresh session and its first refresh token.
+        const refreshSession = 
+        await this.createRefreshSession(user._id)
+
         // Create JWT payload
         const payload = {
             sub: user._id.toString(),
-            role: user.role
+            role: user.role,
+            sid: refreshSession.sessionId.toString()
         }
         
         // Genrate a signed access token.
@@ -402,14 +450,10 @@ export class AuthService {
             payload
         )
 
-        // Create a new refresh session and its first refresh token.
-        const refreshToken = 
-            await this.createRefreshSession(user._id)
-
         // Store the refresh token inside a secure HTTP-only cookie.
         response.cookie(
             'refresh_token',
-            refreshToken,
+            refreshSession.refreshToken,
             {
                 httpOnly: true,
                 secure: true,
@@ -468,7 +512,7 @@ export class AuthService {
 
     private async createRefreshSession(
         userId: Types.ObjectId,
-    ): Promise<string> {
+    ): Promise<RefreshSessionResult> {
         // Generate the raw refresh token that will be sent to the client.
         const rawRefreshToken =
             this.refreshTokenService.generateToken();
@@ -489,32 +533,39 @@ export class AuthService {
         );
 
         // Create the session and its first refresh token atomically.
-        await this.transactionService.run(
-            async(mongoSession) => {
-                
-                // Create a new authentication session for this login.
-                const session = await this.sessionRepository.create({
-                    userId,
-                    expiresAt,
-                },
-                mongoSession
-            );
+        const sessionId = 
+            await this.transactionService.run(
+                async(mongoSession) => {
+                    
+                    // Create a new authentication session for this login.
+                    const session = await this.sessionRepository.create({
+                        userId,
+                        expiresAt,
+                    },
+                    mongoSession
+                    );
 
-            // Create the first refresh token belonging to this session.
-            await this.refreshTokenRepository.create({
-                sessionId: session._id,
-                tokenId,
-                tokenHash,
-                expiresAt,
-            },
-            mongoSession
-            );
+                    // Create the first refresh token belonging to this session.
+                    await this.refreshTokenRepository.create({
+                        sessionId: session._id,
+                        tokenId,
+                        tokenHash,
+                        expiresAt,
+                    },
+                    mongoSession
+                    );
 
-            }
-        );
+                    return session._id
+
+                }
+            );
 
         // Return the raw refresh token to the login flow.
-        return rawRefreshToken;
+        return {
+            sessionId,
+            refreshToken: rawRefreshToken
+
+        };
     }
 
 

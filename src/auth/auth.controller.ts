@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { SignupResponseDto } from './dto/signup-response.dto';
@@ -7,10 +7,50 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { LoginDTO } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import type { Request, Response } from 'express';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { Types } from 'mongoose';
+import { SessionResponseDto } from './dto/session-response.dto';
 
 @Controller('auth')
 export class AuthController {
     constructor(private readonly authService: AuthService){}
+
+    @Get('sessions')
+    @UseGuards(JwtAuthGuard)
+    async getSessions(
+    @Req() request: Request,
+    ): Promise<SessionResponseDto[]> {
+    // Read the authenticated user ID from the JWT payload.
+    const user = request.user as {
+        userId: string;
+    };
+
+    // Return all active sessions belonging to the authenticated user.
+    return this.authService.getSessions(
+        new Types.ObjectId(user.userId),
+    );
+}
+
+    @Post('logout-all')
+    @UseGuards(JwtAuthGuard)
+    async logoutAll(
+        @Req() request: Request,
+        @Res({passthrough: true})
+        response: Response
+    ): Promise<void>{
+        // Red authenticated user
+        const user = request.user as {
+            userId: string
+        }
+
+        // Revoke all sessions 
+        await this.authService.logoutAll(
+            new Types.ObjectId(
+                user.userId
+            ),
+            response
+        )
+    }
 
     @Post('logout')
     async logout(
