@@ -22,6 +22,27 @@ export class SessionRepository
     super(sessionModel);
   }
 
+  async revokeUserSession(
+          sessionId: Types.ObjectId,
+          userId: Types.ObjectId
+      ): Promise<boolean> {
+        // Revoke only when the session belongs to the authenticated user.
+        const result = await this.model.updateOne(
+          {
+            _id: sessionId,
+            userId,
+            revokedAt: {$exists: false}
+          },
+          {
+            $set: {
+              revokedAt: new Date()
+            }
+          }
+        );
+
+        return result.modifiedCount === 1;
+      }
+
   async findActiveSession(
     sessionId: Types.ObjectId,
     session?: ClientSession

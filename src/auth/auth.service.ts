@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PasswordService } from 'src/common/security/password/password.service';
 import { OtpTypes } from './enums/otpType.enum';
 import { UsersService } from 'src/users/users.service';
@@ -45,7 +45,24 @@ export class AuthService {
         this.REFRESH_TOKEN_EXPIRES = this.configService.getOrThrow<number>('REFRESH_TOKEN_EXPIRES')
     }
 
-    
+    async revokeSession(
+        sessionId: Types.ObjectId,
+        userId: Types.ObjectId
+    ): Promise<void> {
+        // Revoke the session only when it belongs to the authenticated user.
+        const revoked = 
+            await this.sessionRepository.revokeUserSession(
+                sessionId,
+                userId
+            );
+
+            // Reject attempts to revoke another user's session or an unknown session.
+            if(!revoked){
+                throw new NotFoundException(
+                    `Session not found`
+                )
+            }
+    }
 
     async getSessions(
         userId: Types.ObjectId

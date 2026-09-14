@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { SignupResponseDto } from './dto/signup-response.dto';
@@ -10,10 +10,32 @@ import type { Request, Response } from 'express';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Types } from 'mongoose';
 import { SessionResponseDto } from './dto/session-response.dto';
+import { ParseObjectIdPipe } from '@nestjs/mongoose';
 
 @Controller('auth')
 export class AuthController {
     constructor(private readonly authService: AuthService){}
+
+    @Delete('sessions/:sessionId')
+    @UseGuards(JwtAuthGuard)
+    async revokeSession(
+        @Param('sessionId', ParseObjectIdPipe)
+        sessionId: Types.ObjectId,
+        @Req() request: Request
+    ): Promise<void> {
+        const user = request.user as {
+            userId: string,
+
+        };
+
+        // Revoke the requested session when it belongs to the authenticated user.
+        await this.authService.revokeSession(
+            sessionId,
+            new Types.ObjectId(user.userId),
+        );
+
+
+    }
 
     @Get('sessions')
     @UseGuards(JwtAuthGuard)
