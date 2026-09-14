@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 
 import {
   BaseRepository,
@@ -81,9 +81,10 @@ export class RefreshTokenRepository extends BaseRepository<RefreshTokenDocument>
   async consumeToken(
     tokenId: string,
     replacedByTokenId: string,
+    session?: ClientSession
 
   ): Promise<RefreshTokenDocument | null>{
-    // Atomically find an active refresh token and mark it as used.
+    // Atomically find an active refresh token and mark it as used "Atomic Operation Prevent Race Condition".
     return this.model.findOneAndUpdate({
         tokenId,
         usedAt: {$exists: false},
@@ -95,6 +96,7 @@ export class RefreshTokenRepository extends BaseRepository<RefreshTokenDocument>
             replacedByTokenId
         }
     },{
+      session,
         returnDocument: 'before'
     }).exec()
 

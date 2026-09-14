@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 
 import {
   BaseRepository,
@@ -24,6 +24,7 @@ export class SessionRepository
 
   async findActiveSession(
     sessionId: Types.ObjectId,
+    session?: ClientSession
   ): Promise<SessionDocument | null> {
     // Find a session that has not been revoked and has not expired.
     return this.model
@@ -31,7 +32,8 @@ export class SessionRepository
         _id: sessionId,
         revokedAt: { $exists: false },
         expiresAt: { $gt: new Date() },
-      })
+      }
+    ).session(session ?? null)
       .exec();
   }
 
@@ -54,6 +56,7 @@ export class SessionRepository
 
   async updateLastUsed(
     sessionId: Types.ObjectId,
+    session: ClientSession
   ): Promise<void> {
     // Update the last time this session was used.
     await this.model.updateOne(
@@ -66,6 +69,9 @@ export class SessionRepository
           lastUsedAt: new Date(),
         },
       },
+      {
+        session
+      }
     );
   }
 }

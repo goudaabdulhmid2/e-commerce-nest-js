@@ -19,6 +19,7 @@ import { RefreshTokenRepository } from './repositories/refresh-token.repository'
 import { Types } from 'mongoose';
 import { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
+import { RefreshTokenReuseError } from './errors/refresh-token-reuse.error';
 
 @Injectable()
 export class AuthService {
@@ -43,134 +44,178 @@ export class AuthService {
 
     async refresh(
         refreshToken: string,
-        response: Response
-    ): Promise<LoginResponseDto>{
-       // Reject the request when no refresh token was provided.
-       if(!refreshToken){
+        response: Response,
+    ): Promise<LoginResponseDto> {
+    // Reject the request when the refresh token is missing.
+    if (!refreshToken) {
         throw new UnauthorizedException(
-            'Refresh token is required'
-        )
-       }
+        'Refresh token is required',
+        );
+    }
 
-       // Hash the raw refresh token so it can be safely looked up in the database.
-       const tokenHash = 
-        this.refreshTokenService.hashToken(refreshToken)
-
-        // Find the refresh token record using its hash.
-        const storedToken = 
-            await this.refreshTokenRepository.findByHash(tokenHash)
-
-        // Reject the request when the refresh token does not exist.
-        if(!storedToken){
-            throw new UnauthorizedException(
-                'Invalid refresh token'
-            );
-        }
-
-        // Find the auth session associated with the refresh token
-        const session =
-            await this.sessionRepository.findActiveSession(
-                storedToken.sessionId
-            )
-        
-        // Reject the request when the session is revoked or expired.
-        if(!session){
-            throw new UnauthorizedException(
-                'Session is no longer active'
-            )
-        }
-
-        // Generate the identifier for the new refresh token.
-        const newTokenId = 
-            this.refreshTokenService.generateTokenId()
-        
-        // Atomically consume the current refresh token.
-        const consumedToken = 
-            await this.refreshTokenRepository.consumeToken(
-                storedToken.tokenId,
-                newTokenId
-            )
-        
-        // Detect concurrent refresh requests using the same token.
-        if(!consumedToken){
-            // Revoke the entire session because token reuse was detected.
-            await this.sessionRepository.revoke(
-                session._id
-            );
-
-            // Reject the request because the token was already consumed.
-            throw new UnauthorizedException(
-             'Refresh token reuse detected',
-            );
-        }
-
-        // Generate the new raw refresh token.
-        const newRefreshToken =
-            this.refreshTokenService.generateToken();
-
-        // Hash
-        const newTokenHash = 
-            this.refreshTokenService.hashToken(newRefreshToken);
-
-        // Calculate the expiration time of the new refresh token.
-        const expiresAt = new Date(
-            Date.now() + this.REFRESH_TOKEN_EXPIRES
-        )
-
-        // store the new rfresh token for the same session
-        await this.refreshTokenRepository.create({
-            sessionId: session._id,
-            tokenId: newTokenId,
-            tokenHash: newTokenHash,
-            expiresAt,
-        });
-
-        // Update the session activity timestamp
-        await this.sessionRepository.updateLastUsed(
-            session._id
-        )
-
-        const user =
-            await this.userService.findUserById(
-                session.userId,
-            );
-
-        if (!user || user.isDeleted) {
-            // Reject the refresh request when the user no longer exists or was deleted.
-            throw new UnauthorizedException(
-                'User account is no longer active',
-            );
-        }
-
-        // Build the access token payload
-        const patload = {
-            sub: user._id.toString(),
-            role:user.role
-        }
-
-        // Generate a new short-lived access token.
-        const accessToken = 
-            await this.jwtService.signAsync(patload);
-
-        // Replace the refresh token stored in the HTTP-only cookie.
-        response.cookie(
-            'refresh_token',
-            newRefreshToken,
-            {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'strict',
-            path: '/auth',
-            maxAge: this.REFRESH_TOKEN_EXPIRES,
-            },
-    );
-
-        // Return the new access token to the client.
-        return AuthMapper.toLoginResponse(
-            accessToken,
+    // Hash the raw refresh token for database lookup.
+    const tokenHash =
+        this.refreshTokenService.hashToken(
+        refreshToken,
         );
 
+    // Find the refresh token record by its hash.
+    const storedToken =
+        await this.refreshTokenRepository.findByHash(
+        tokenHash,
+        );
+
+    // Reject completely unknown refresh tokens.
+    if (!storedToken) {
+        throw new UnauthorizedException(
+        'Invalid refresh token',
+        );
     }
+
+    // Generate the identifier for the replacement token.
+    const newTokenId =
+        this.refreshTokenService.generateTokenId();
+
+    // Generate the raw replacement refresh token.
+    const newRefreshToken =
+        this.refreshTokenService.generateToken();
+
+    // Hash the replacement refresh token before storing it.
+    const newTokenHash =
+        this.refreshTokenService.hashToken(
+        newRefreshToken,
+        );
+
+    // Calculate the expiration time of the replacement token.
+    const expiresAt = new Date(
+        Date.now() + this.REFRESH_TOKEN_EXPIRES,
+    );
+
+    let userId: Types.ObjectId;
+
+    try{
+
+        // Rotate the refresh token and update the session atomically.
+        const rotationResult =
+            await this.transactionService.run(
+            async (mongoSession) => {
+                // Find the session inside the transaction.
+                const session =
+                await this.sessionRepository.findActiveSession(
+                    storedToken.sessionId,
+                    mongoSession,
+                );
+    
+                // Reject the request when the session is no longer active.
+                if (!session) {
+                    throw new UnauthorizedException(
+                        'Session is no longer active',
+                    );
+                }
+    
+                // Atomically consume the current refresh token.
+                const consumedToken =
+                await this.refreshTokenRepository.consumeToken(
+                    storedToken.tokenId,
+                    newTokenId,
+                    mongoSession,
+                );
+    
+                // Detect token reuse or a concurrent refresh request.
+                if (!consumedToken) {
+                throw new RefreshTokenReuseError(
+                    session._id,
+                );
+                }
+    
+                // Store the replacement refresh token.
+                await this.refreshTokenRepository.create(
+                {
+                    sessionId: session._id,
+                    tokenId: newTokenId,
+                    tokenHash: newTokenHash,
+                    expiresAt,
+                },
+                    mongoSession,
+                );
+    
+                // Update the session activity timestamp.
+                await this.sessionRepository.updateLastUsed(
+                    session._id,
+                    mongoSession,
+                );
+    
+                // Return the session information after the transaction succeeds.
+                return {
+                    userId: session.userId,
+                };
+            },
+            );
+
+        userId = rotationResult.userId
+    }catch(error){
+        // Revoke the entire session when refresh-token reuse is detected
+        if(error instanceof RefreshTokenReuseError){
+            // Revoke the authentication session
+            await this.sessionRepository.revoke(
+                error.sessionId
+            )
+
+            // Revoke all refresh tokens belongign to the sessio
+            await this.refreshTokenRepository.revokeBySessionId(
+                error.sessionId
+            )
+            // Reject the reused refresh token.
+            throw new UnauthorizedException(
+            'Refresh token reuse detected',
+            );
+        }
+
+        // Re-throw all unrelated errors
+        throw error;
+    }
+
+    // Load the current user after the transaction has committed.
+    const user =
+        await this.userService.findUserById(
+            userId,
+        );
+
+    // Reject the refresh when the user no longer exists or was deleted.
+    if (!user || user.isDeleted) {
+        throw new UnauthorizedException(
+        'User account is no longer active',
+        );
+    }
+
+    // Build the access token payload using the user's current role.
+    const payload = {
+        sub: user._id.toString(),
+        role: user.role,
+    };
+
+    // Generate a new short-lived access token.
+    const accessToken =
+        await this.jwtService.signAsync(payload);
+
+    // Replace the old refresh token cookie with the new token.
+    response.cookie(
+        'refresh_token',
+        newRefreshToken,
+        {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        path: '/auth',
+        maxAge: this.REFRESH_TOKEN_EXPIRES,
+        },
+    );
+
+    // Return the new access token to the client.
+    return AuthMapper.toLoginResponse(
+        accessToken,
+    );
+}
 
     async verifyOtp(
         verifyOtpDto: VerifyOtpDto
