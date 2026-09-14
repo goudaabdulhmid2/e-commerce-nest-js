@@ -42,6 +42,51 @@ export class AuthService {
         this.REFRESH_TOKEN_EXPIRES = this.configService.getOrThrow<number>('REFRESH_TOKEN_EXPIRES')
     }
 
+    async logout(
+        refreshToken: string,
+        response: Response
+    ): Promise<void>{
+        // Always clear the refresh-token cookie from the client.
+        response.clearCookie(
+            'refresh_token',
+            {
+                httpOnly:true,
+                secure: true,
+                sameSite: 'strict',
+                path: '/auth'
+            }
+        )
+
+        // Nothing else is required when no refresh token exists.
+        if(!refreshToken){
+            return
+        }
+
+        // Hash the raw refresh token for database lookup.
+        const tokenHash = 
+            this.refreshTokenService.hashToken(
+                refreshToken
+            );
+        
+        // Find the refresh token record
+        const storedToken = 
+            await this.refreshTokenRepository.findByHash(
+                tokenHash
+            )
+
+        // Nothing needs to be revoked when the token is unknown.
+        if(!storedToken){
+            return;
+        }
+
+        // Revoke the authentication session.
+        await this.sessionRepository.revoke(
+            storedToken.sessionId,
+        );
+
+        
+    }
+
     async refresh(
         refreshToken: string,
         response: Response,
@@ -156,15 +201,12 @@ export class AuthService {
     }catch(error){
         // Revoke the entire session when refresh-token reuse is detected
         if(error instanceof RefreshTokenReuseError){
-            // Revoke the authentication session
+            // Revoke the authentication session 
+            // Revoke the authentication session.
             await this.sessionRepository.revoke(
-                error.sessionId
-            )
-
-            // Revoke all refresh tokens belongign to the sessio
-            await this.refreshTokenRepository.revokeBySessionId(
-                error.sessionId
-            )
+                error.sessionId,
+                
+            );
             // Reject the reused refresh token.
             throw new UnauthorizedException(
             'Refresh token reuse detected',
@@ -215,7 +257,7 @@ export class AuthService {
     return AuthMapper.toLoginResponse(
         accessToken,
     );
-}
+    }
 
     async verifyOtp(
         verifyOtpDto: VerifyOtpDto
@@ -446,23 +488,37 @@ export class AuthService {
             Date.now() + this.REFRESH_TOKEN_EXPIRES,
         );
 
-        // Create a new authentication session for this login.
-        const session = await this.sessionRepository.create({
-            userId,
-            expiresAt,
-        });
+        // Create the session and its first refresh token atomically.
+        await this.transactionService.run(
+            async(mongoSession) => {
+                
+                // Create a new authentication session for this login.
+                const session = await this.sessionRepository.create({
+                    userId,
+                    expiresAt,
+                },
+                mongoSession
+            );
 
-        // Create the first refresh token belonging to this session.
-        await this.refreshTokenRepository.create({
-            sessionId: session._id,
-            tokenId,
-            tokenHash,
-            expiresAt,
-        });
+            // Create the first refresh token belonging to this session.
+            await this.refreshTokenRepository.create({
+                sessionId: session._id,
+                tokenId,
+                tokenHash,
+                expiresAt,
+            },
+            mongoSession
+            );
+
+            }
+        );
 
         // Return the raw refresh token to the login flow.
         return rawRefreshToken;
-}
+    }
+
+
+
 
     
 

@@ -12,6 +12,22 @@ import type { Request, Response } from 'express';
 export class AuthController {
     constructor(private readonly authService: AuthService){}
 
+    @Post('logout')
+    async logout(
+        @Req() request: Request,
+        @Res({passthrough: true}) response: Response
+    ): Promise<void>{
+        // Read the refresh token from the HTTP-only cookie.
+        const refreshToken = 
+            request.cookies?.refresh_token;
+
+        // Revoke the refresh session and clear the cookie
+        await this.authService.logout(
+            refreshToken,
+            response
+        )
+    }
+
     @Post('verify-otp')
     @Throttle({
         default:{

@@ -39,6 +39,7 @@ export class SessionRepository
 
   async revoke(
     sessionId: Types.ObjectId,
+    session?: ClientSession
   ): Promise<void> {
     // Revoke the authentication session.
     await this.model.updateOne(
@@ -51,6 +52,10 @@ export class SessionRepository
           revokedAt: new Date(),
         },
       },
+      {
+        session
+      }
+
     );
   }
 

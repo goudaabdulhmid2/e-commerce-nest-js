@@ -63,6 +63,7 @@ export class RefreshTokenRepository extends BaseRepository<RefreshTokenDocument>
 
   async revokeBySessionId(
     sessionId: Types.ObjectId,
+    session?: ClientSession
   ): Promise<void> {
     // Revoke all refresh tokens belonging to the session.
     await this.model.updateMany(
@@ -75,6 +76,9 @@ export class RefreshTokenRepository extends BaseRepository<RefreshTokenDocument>
           revokedAt: new Date(),
         },
       },
+      {
+        session
+      }
     );
   }
 
